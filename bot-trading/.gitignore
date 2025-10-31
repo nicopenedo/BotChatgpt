@@ -1,0 +1,13 @@
+/target/
+/.idea/
+/.project
+/.classpath
+/.settings/
+/.mvn/
+*.iml
+.env
+*.log
+.DS_Store
+.idea/
+/node_modules/
+/secrets/

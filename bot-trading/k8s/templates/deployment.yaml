@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bot-trading
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: bot-trading
+  template:
+    metadata:
+      labels:
+        app: bot-trading
+    spec:
+      containers:
+        - name: bot-trading
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "test"
+            - name: TRADING_LIVE_ENABLED
+              value: "{{ .Values.trading.liveEnabled }}"
+          envFrom:
+            - secretRef:
+                name: bot-trading-secrets
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bot-trading
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: bot-trading
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8080
