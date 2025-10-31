@@ -1,0 +1,5 @@
+apiVersion: v2
+name: bot-trading
+version: 0.1.0
+description: Helm chart for Binance Spot scalping bot
+appVersion: "1.0.0"
