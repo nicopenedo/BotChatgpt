@@ -178,12 +178,15 @@ public class BinanceClientImpl implements BinanceClient {
     if (request.getType() == OrderType.LIMIT) {
       params.put("price", request.getPrice().toPlainString());
       params.put("quantity", request.getQuantity().toPlainString());
-      params.put("timeInForce", "GTC");
+      params.put("timeInForce", request.getTimeInForce() != null ? request.getTimeInForce() : "GTC");
     } else {
       if (request.getSide() == OrderSide.BUY && request.getQuoteAmount() != null) {
         params.put("quoteOrderQty", request.getQuoteAmount().toPlainString());
       } else {
         params.put("quantity", request.getQuantity().toPlainString());
+      }
+      if (request.getTimeInForce() != null) {
+        params.put("timeInForce", request.getTimeInForce());
       }
     }
 
@@ -213,6 +216,11 @@ public class BinanceClientImpl implements BinanceClient {
   @Override
   public void cancelOrder(ManagedOrderEntity order) {
     log.debug("Simulating cancel of managed order {}", order.getClientOrderId());
+  }
+
+  @Override
+  public void cancelOrder(String symbol, String clientOrderId) {
+    log.debug("Simulating cancel for symbol {} clientOrderId {}", symbol, clientOrderId);
   }
 
   @Override

@@ -34,6 +34,8 @@ public interface BinanceClient {
 
   void cancelOrder(ManagedOrderEntity order);
 
+  void cancelOrder(String symbol, String clientOrderId);
+
   List<ExchangeOrder> getOpenOrders(String symbol);
 
   List<ExchangeOrder> getRecentOrders(String symbol, int lookbackMinutes);
