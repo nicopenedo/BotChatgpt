@@ -25,7 +25,10 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers("/actuator/health").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/market/**").hasRole("READ")
+                    .requestMatchers(HttpMethod.GET, "/api/market/**")
+                    .hasAnyRole("VIEWER", "READ")
+                    .requestMatchers("/api/reports/**").hasRole("VIEWER")
+                    .requestMatchers("/ui/**").hasRole("VIEWER")
                     .requestMatchers("/api/trade/**").hasRole("TRADE")
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .anyRequest()
@@ -37,14 +40,21 @@ public class SecurityConfig {
   @Bean
   public UserDetailsService users(PasswordEncoder passwordEncoder) {
     return new InMemoryUserDetailsManager(
-        User.withUsername("reader").password(passwordEncoder.encode("readerPass")).roles("READ").build(),
+        User.withUsername("viewer")
+            .password(passwordEncoder.encode("viewerPass"))
+            .roles("VIEWER")
+            .build(),
+        User.withUsername("reader")
+            .password(passwordEncoder.encode("readerPass"))
+            .roles("READ")
+            .build(),
         User.withUsername("trader")
             .password(passwordEncoder.encode("traderPass"))
-            .roles("READ", "TRADE")
+            .roles("READ", "VIEWER", "TRADE")
             .build(),
         User.withUsername("admin")
             .password(passwordEncoder.encode("adminPass"))
-            .roles("READ", "TRADE", "ADMIN")
+            .roles("READ", "VIEWER", "TRADE", "ADMIN")
             .build());
   }
 

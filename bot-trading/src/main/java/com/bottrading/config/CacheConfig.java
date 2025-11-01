@@ -12,6 +12,9 @@ public class CacheConfig {
 
   public static final String EXCHANGE_INFO_CACHE = "exchangeInfo";
   public static final String COMMISSION_CACHE = "tradingCommission";
+  public static final String KLINES_CACHE = "klines";
+  public static final String INDICATOR_CACHE = "indicatorSeries";
+  public static final String REPORT_CACHE = "reportAggregations";
 
   @Bean
   public Caffeine<Object, Object> caffeine() {
@@ -20,7 +23,13 @@ public class CacheConfig {
 
   @Bean
   public CacheManager cacheManager(Caffeine<Object, Object> caffeine) {
-    CaffeineCacheManager manager = new CaffeineCacheManager(EXCHANGE_INFO_CACHE, COMMISSION_CACHE);
+    CaffeineCacheManager manager =
+        new CaffeineCacheManager(
+            EXCHANGE_INFO_CACHE,
+            COMMISSION_CACHE,
+            KLINES_CACHE,
+            INDICATOR_CACHE,
+            REPORT_CACHE);
     manager.setCaffeine(caffeine);
     return manager;
   }

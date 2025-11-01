@@ -1,0 +1,27 @@
+body {
+  background-color: #f7f7f7;
+}
+
+.navbar-brand {
+  font-weight: 600;
+}
+
+.toggles .form-check {
+  margin-right: 0.75rem;
+}
+
+#heatmap {
+  height: 250px;
+}
+
+.card {
+  border-radius: 0.75rem;
+}
+
+.table thead th {
+  white-space: nowrap;
+}
+
+.table tbody td {
+  vertical-align: middle;
+}

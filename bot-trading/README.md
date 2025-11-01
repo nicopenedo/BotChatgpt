@@ -73,7 +73,15 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | Método | Endpoint | Rol requerido | Descripción |
 |--------|----------|---------------|-------------|
 | GET | `/api/market/price?symbol=BTCUSDT` | `READ` | Precio spot actual. |
-| GET | `/api/market/klines?symbol=BTCUSDT&interval=1m&limit=200` | `READ` | Serie de velas. |
+| GET | `/api/market/klines?symbol=BTCUSDT&interval=1m&limit=200` | `VIEWER`/`READ` | Serie de velas, soporta filtros `from`/`to`. |
+| GET | `/api/market/vwap?symbol=BTCUSDT&interval=1m` | `VIEWER` | VWAP diario o anclado (`anchorTs`). |
+| GET | `/api/indicators/atr-bands?symbol=BTCUSDT&interval=1m&period=14&mult=1.0` | `VIEWER` | Bandas ATR (mid/upper/lower). |
+| GET | `/api/indicators/supertrend?symbol=BTCUSDT&interval=1m&atrPeriod=14&multiplier=3` | `VIEWER` | Serie Supertrend (opcional). |
+| GET | `/api/reports/trades` | `VIEWER` | Trades paginados con filtros y export CSV/JSON. |
+| GET | `/api/reports/summary?groupBy=day|week|month|range` | `VIEWER` | Resumen agregado con KPIs. |
+| GET | `/api/reports/equity` | `VIEWER` | Serie de equity y `/api/reports/drawdown`. |
+| GET | `/api/reports/annotations` | `VIEWER` | Marcadores BUY/SELL/SL/TP/BE/Trailing. |
+| GET | `/api/reports/heatmap` | `VIEWER` | Heatmap PnL hora/día con export CSV. |
 | POST | `/api/trade/order` | `TRADE` | Enviar orden (LIMIT/MARKET). |
 | GET | `/api/trade/order/{id}?symbol=BTCUSDT` | `READ` | Consultar estado de orden. |
 | GET | `/api/account/balances?assets=USDT,BTC` | `READ` | Balances filtrados. |
@@ -88,6 +96,28 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/api/positions/{id}` | `READ` | Recupera el detalle de una posición. |
 | POST | `/admin/positions/{id}/close` | `ADMIN` | Cierra una posición y cancela órdenes gestionadas. |
 | POST | `/admin/reconcile` | `ADMIN` | Fuerza reconciliación contra Binance. |
+
+## Panel Web de Trading
+
+La ruta `GET /ui/dashboard` (rol `VIEWER`) habilita un panel completo construido con **Thymeleaf + Chart.js Financial**.
+
+- **Filtros persistentes:** símbolo, intervalo, rango de fechas (`from/to` en la URL), side y estado de la posición.
+- **Gráfico principal:** velas con overlays seleccionables (VWAP diario, VWAP anclado, ATR Bands, Supertrend) y volumen opcional.
+- **Marcadores avanzados:** BUY/SELL, SL, TP, BE y Trailing con tooltip (PnL, fee, slippage en bps, nota de decisión).
+- **Curvas sincronizadas:** equity y drawdown reaccionan al crosshair del gráfico de precio.
+- **Heatmap PnL:** vista 7×24 coloreada según net PnL/win rate, exportable CSV.
+- **KPIs:** Net PnL, Trades, Win rate, Profit factor, Max DD, Sharpe y Sortino actualizados al rango activo.
+- **Tablas:** trades paginados y resúmenes diarios/semanales/mensuales o por rango.
+- **Exports:** botones directos para CSV/JSON (trades, summary, equity, heatmap) y PNG del gráfico principal.
+- **Overlays adicionales:** selector de VWAP anclado (datetime), toggles para ATR/Supertrend/volumen/marcadores, guardados en querystring.
+
+Para iniciar sesión demo usar `viewer/viewerPass`. El front consume los endpoints `/api/reports/**` y `/api/market/**`, todos protegidos por el rol `VIEWER`.
+
+### URLs útiles
+- `/ui/dashboard?symbol=BTCUSDT&interval=1h&from=2024-01-01T00:00:00Z&to=2024-01-07T00:00:00Z`
+- `/api/reports/summary?symbol=ETHUSDT&groupBy=month&from=2024-01-01T00:00:00Z&to=2024-03-31T23:59:59Z`
+- `/api/market/vwap?symbol=BTCUSDT&interval=5m&anchorTs=2024-01-05T12:00:00Z`
+- `/api/reports/trades/export.csv?symbol=BTCUSDT&from=2024-01-01T00:00:00Z&to=2024-01-31T23:59:59Z`
 
 ## Señales & Estrategia
 - Las señales técnicas viven en `src/main/java/com/bottrading/strategy/signals/` e incluyen SMA/EMA crossover, MACD, RSI con filtro de tendencia, Bollinger Bands, Supertrend, Donchian, Stochastic, VWAP, filtros ATR/ADX/volumen 24h y más.
