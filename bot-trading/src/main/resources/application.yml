@@ -44,3 +44,13 @@ bandit:
   min_samples_to_compete: 30
   decay:
     half_life_days: 21
+var:
+  enabled: true
+  quantile: 0.99
+  cvar_target_pct_per_trade: 0.25
+  cvar_target_pct_per_day: 1.5
+  lookback_trades: 250
+  min_trades_for_symbol_preset: 80
+  fallback_to_regime_pool: true
+  mc_iterations: 20000
+  heavy_tails: true

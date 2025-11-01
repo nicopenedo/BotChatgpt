@@ -35,6 +35,7 @@ public class RiskGuard {
   private final RiskAction riskAction;
   private final RiskEventRepository riskEventRepository;
   private final Counter stopouts;
+  private final IntradayVarService intradayVarService;
 
   private final AtomicReference<BigDecimal> equityStart = new AtomicReference<>(BigDecimal.ZERO);
   private final AtomicReference<BigDecimal> equityPeak = new AtomicReference<>(BigDecimal.ZERO);
@@ -62,13 +63,15 @@ public class RiskGuard {
       TradingState tradingState,
       RiskAction riskAction,
       RiskEventRepository riskEventRepository,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      IntradayVarService intradayVarService) {
     this.tradingProperties = tradingProperties;
     this.riskProperties = riskProperties;
     this.tradingState = tradingState;
     this.riskAction = riskAction;
     this.riskEventRepository = riskEventRepository;
     this.stopouts = meterRegistry.counter("risk.stopouts", Tags.empty());
+    this.intradayVarService = intradayVarService;
     meterRegistry.gauge("risk.equity", Tags.empty(), currentEquity, ref -> ref.get().doubleValue());
     meterRegistry.gauge("risk.daily_pnl", Tags.empty(), dailyPnl, ref -> ref.get().doubleValue());
     meterRegistry.gauge("risk.dd_max", Tags.empty(), maxDrawdownPct, ref -> ref.get().doubleValue());
@@ -84,6 +87,9 @@ public class RiskGuard {
     }
     resetIfNeeded();
     currentEquity.set(equity);
+    if (intradayVarService != null && intradayVarService.isEnabled()) {
+      intradayVarService.updateEquity(equity);
+    }
     if (equityStart.get().compareTo(BigDecimal.ZERO) == 0) {
       equityStart.set(equity);
       equityPeak.set(equity);
@@ -112,6 +118,20 @@ public class RiskGuard {
           RiskFlag.TRADE_LIMIT,
           "Max openings reached: " + openingsToday.get() + "/" + riskProperties.getMaxOpeningsPerDay());
       return false;
+    }
+    if (intradayVarService != null
+        && intradayVarService.isEnabled()
+        && currentEquity.get().compareTo(BigDecimal.ZERO) > 0) {
+      IntradayVarService.ExposureSnapshot exposure = intradayVarService.exposure(currentEquity.get());
+      if (exposure.limit().compareTo(BigDecimal.ZERO) > 0
+          && exposure.exposure().compareTo(exposure.limit()) >= 0) {
+        log.debug(
+            "VAR daily budget reached for {} exposure={} limit={}",
+            symbol,
+            exposure.exposure(),
+            exposure.limit());
+        return false;
+      }
     }
     return true;
   }
@@ -188,6 +208,13 @@ public class RiskGuard {
   }
 
   public synchronized RiskState getState() {
+    IntradayVarService.ExposureSnapshot exposure =
+        intradayVarService != null
+                && intradayVarService.isEnabled()
+                && currentEquity.get().compareTo(BigDecimal.ZERO) > 0
+            ? intradayVarService.exposure(currentEquity.get())
+            : new IntradayVarService.ExposureSnapshot(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
     return new RiskState(
         RiskMode.fromTradingState(tradingState.getMode()),
         dailyPnl.get(),
@@ -199,7 +226,10 @@ public class RiskGuard {
         openingsToday.get(),
         currentEquity.get(),
         flags,
-        lastReset);
+        lastReset,
+        exposure.exposure(),
+        exposure.limit(),
+        exposure.ratio());
   }
 
   private void evaluateLosses() {

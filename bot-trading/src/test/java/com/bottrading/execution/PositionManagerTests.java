@@ -128,7 +128,11 @@ class PositionManagerTests {
             BigDecimal.valueOf(98),
             BigDecimal.valueOf(102),
             null,
-            "entry"));
+            "entry",
+            null,
+            null,
+            null,
+            null));
 
     ManagedOrderEntity takeProfit =
         orders.values().stream().filter(o -> o.getType() == ManagedOrderType.TAKE_PROFIT).findFirst().orElseThrow();
@@ -179,7 +183,11 @@ class PositionManagerTests {
             BigDecimal.valueOf(102),
             BigDecimal.valueOf(98),
             null,
-            "entry"));
+            "entry",
+            null,
+            null,
+            null,
+            null));
 
     ManagedOrderEntity stopLoss =
         orders.values().stream().filter(o -> o.getType() == ManagedOrderType.STOP_LOSS).findFirst().orElseThrow();

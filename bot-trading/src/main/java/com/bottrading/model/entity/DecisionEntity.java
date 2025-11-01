@@ -7,6 +7,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.UUID;
 import java.time.Instant;
 
 @Entity
@@ -36,6 +37,18 @@ public class DecisionEntity {
 
   @Column(name = "order_id")
   private String orderId;
+
+  @Column(name = "regime_trend")
+  private String regimeTrend;
+
+  @Column(name = "regime_volatility")
+  private String regimeVolatility;
+
+  @Column(name = "preset_key")
+  private String presetKey;
+
+  @Column(name = "preset_id")
+  private UUID presetId;
 
   public String getDecisionKey() {
     return decisionKey;
@@ -115,5 +128,37 @@ public class DecisionEntity {
 
   public void setOrderId(String orderId) {
     this.orderId = orderId;
+  }
+
+  public String getRegimeTrend() {
+    return regimeTrend;
+  }
+
+  public void setRegimeTrend(String regimeTrend) {
+    this.regimeTrend = regimeTrend;
+  }
+
+  public String getRegimeVolatility() {
+    return regimeVolatility;
+  }
+
+  public void setRegimeVolatility(String regimeVolatility) {
+    this.regimeVolatility = regimeVolatility;
+  }
+
+  public String getPresetKey() {
+    return presetKey;
+  }
+
+  public void setPresetKey(String presetKey) {
+    this.presetKey = presetKey;
+  }
+
+  public UUID getPresetId() {
+    return presetId;
+  }
+
+  public void setPresetId(UUID presetId) {
+    this.presetId = presetId;
   }
 }

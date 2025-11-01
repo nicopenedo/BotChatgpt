@@ -303,6 +303,15 @@ public class TradingScheduler {
     entity.setReason(record.reason());
     entity.setExecuted(record.executed());
     entity.setOrderId(record.orderId());
+    entity.setRegimeTrend(
+        record.decision().regime() != null ? record.decision().regime().trend().name() : null);
+    entity.setRegimeVolatility(
+        record.decision().regime() != null ? record.decision().regime().volatility().name() : null);
+    entity.setPresetKey(record.decision().preset());
+    entity.setPresetId(
+        record.decision().banditSelection() != null
+            ? record.decision().banditSelection().presetId()
+            : null);
     decisionRepository.save(entity);
   }
 
