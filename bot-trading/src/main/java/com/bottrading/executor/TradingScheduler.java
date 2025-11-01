@@ -23,6 +23,7 @@ import com.bottrading.strategy.StrategyDecision;
 import com.bottrading.service.preset.CanaryStageService;
 import com.bottrading.throttle.Endpoint;
 import com.bottrading.throttle.Throttle;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -84,6 +85,7 @@ public class TradingScheduler {
   private final ConcurrentMap<String, AtomicLong> lastCloseTimes = new ConcurrentHashMap<>();
   private final AtomicReference<String> lastDecisionKey = new AtomicReference<>("NONE");
   private final Deque<Instant> orderTimes = new ConcurrentLinkedDeque<>();
+  private final ConcurrentMap<String, AtomicLong> backlogGauge = new ConcurrentHashMap<>();
 
   public TradingScheduler(
       TradingProps tradingProps,
@@ -127,6 +129,10 @@ public class TradingScheduler {
             .publishPercentileHistogram()
             .register(meterRegistry);
     meterRegistry.gauge("scheduler.candle.enabled", Tags.empty(), enabled, value -> value.get() ? 1.0 : 0.0);
+    registerBacklogGauge(tradingProps.getSymbol());
+    for (String symbol : tradingProps.getSymbols()) {
+      registerBacklogGauge(symbol);
+    }
   }
 
   @PostConstruct
@@ -253,6 +259,8 @@ public class TradingScheduler {
     try {
       applyJitter();
       Instant now = Instant.now(clock);
+      long backlog = Math.max(0, now.toEpochMilli() - closeTime);
+      registerBacklogGauge(symbol).set(backlog);
       String decisionKey = decisionKey(symbol, interval, closeTime);
       lastDecisionKey.set(decisionKey);
       if (decisionRepository.existsById(decisionKey)) {
@@ -454,6 +462,18 @@ public class TradingScheduler {
 
   private void incrementDecisionMetric(String result, String reason) {
     meterRegistry.counter("scheduler.candle.decisions", Tags.of("result", result, "reason", reason)).increment();
+  }
+
+  private AtomicLong registerBacklogGauge(String symbol) {
+    return backlogGauge.computeIfAbsent(
+        symbol,
+        key -> {
+          AtomicLong value = new AtomicLong(0L);
+          Gauge.builder("scheduler.candle.backlog.ms", value, AtomicLong::get)
+              .tags("symbol", key)
+              .register(meterRegistry);
+          return value;
+        });
   }
 
   private String decisionKey(String symbol, String interval, long closeTime) {

@@ -1,0 +1,163 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "bps"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "expr": "anomaly_metric{app=\"bot-trading\",metric=\"slippage_bps\"}",
+          "legendFormat": "slippage {{symbol}}"
+        },
+        {
+          "expr": "anomaly_metric{app=\"bot-trading\",metric=\"spread_bps\"}",
+          "legendFormat": "spread {{symbol}}"
+        }
+      ],
+      "title": "Slippage vs Spread",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "percentunit"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(orders_filled_total{app=\"bot-trading\"}[15m])) / sum(rate(orders_sent_total{app=\"bot-trading\"}[15m]))",
+          "legendFormat": "fill rate"
+        }
+      ],
+      "title": "Fill Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "milliseconds"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(exec_queueTime_ms_sum{app=\"bot-trading\"}[5m])) / sum(rate(exec_queueTime_ms_count{app=\"bot-trading\"}[5m]))",
+          "legendFormat": "avg queue"
+        }
+      ],
+      "title": "Order Queue Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "none"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {
+        "legend": {"displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(exec_limit_replaces_total{app=\"bot-trading\"}[15m]))",
+          "legendFormat": "replaces/min"
+        }
+      ],
+      "title": "Limit Replacements",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "milliseconds"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "single"}
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(exec_limit_ttl_ms_sum{app=\"bot-trading\"}[15m])) / sum(rate(exec_limit_ttl_ms_count{app=\"bot-trading\"}[15m]))",
+          "legendFormat": "TTL avg"
+        }
+      ],
+      "title": "TTL Before Replace",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {
+        "defaults": {"unit": "bps"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "targets": [
+        {
+          "expr": "tca_slippage_avg_bps{app=\"bot-trading\"}",
+          "legendFormat": "{{symbol}}"
+        }
+      ],
+      "title": "TCA Slippage",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["bot-trading", "execution"],
+  "templating": {"list": []},
+  "time": {"from": "now-12h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "Execution & TCA",
+  "uid": null,
+  "version": 1
+}

@@ -1,0 +1,53 @@
+{
+  "groups": [
+    {
+      "name": "trading-loop",
+      "rules": [
+        {
+          "alert": "HighSlippage",
+          "expr": "avg_over_time(tca_slippage_avg_bps{app=\"bot-trading\"}[15m]) > 5",
+          "for": "15m",
+          "labels": {"severity": "warning"},
+          "annotations": {
+            "summary": "Slippage promedio elevado",
+            "description": "El slippage medio supera 5 bps durante 15 minutos consecutivos. Revisar ejecución/TCA."
+          }
+        },
+        {
+          "alert": "RateLimitOrWsIssues",
+          "expr": "(sum(rate(binance_api_requests_total{app=\"bot-trading\",status=\"rate_limited\"}[5m])) > 0.2) or (max(risk_ws_reconnects{app=\"bot-trading\"}) > 3)",
+          "for": "5m",
+          "labels": {"severity": "critical"},
+          "annotations": {
+            "summary": "Problemas de conectividad o rate limiting",
+            "description": "Binance responde 429 de forma sostenida o el WS reconecta más de 3 veces. Activar plan de contingencia."
+          }
+        },
+        {
+          "alert": "DailyLossBreach",
+          "expr": "risk_daily_loss_pct{app=\"bot-trading\"} > risk_daily_loss_limit_pct{app=\"bot-trading\"}",
+          "for": "5m",
+          "labels": {"severity": "critical"},
+          "annotations": {
+            "summary": "Pérdida diaria excede el límite",
+            "description": "El drawdown diario supera el máximo configurado. Pausar trading automáticamente y notificar por Telegram."
+          }
+        }
+      ]
+    },
+    {
+      "name": "bandit-research",
+      "rules": [
+        {
+          "alert": "BanditRewardNegative",
+          "expr": "(avg_over_time(bandit_reward_avg_sum{app=\"bot-trading\"}[3d]) / clamp_min(avg_over_time(bandit_reward_avg_count{app=\"bot-trading\"}[3d]), 1)) < 0",
+          "labels": {"severity": "warning"},
+          "annotations": {
+            "summary": "Reward promedio negativo",
+            "description": "El reward medio del bandit es negativo al promediar los últimos 3 días. Revisar presets canary."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -15,8 +15,16 @@
   <body data-default-symbol="[[${defaultSymbol}]]" data-default-interval="[[${defaultInterval}]]"
         data-default-from="[[${defaultFrom}]]" data-default-to="[[${defaultTo}]]">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container-fluid">
+      <div class="container-fluid d-flex justify-content-between align-items-center">
         <span class="navbar-brand">Trading Reports</span>
+        <a
+          th:if="${grafanaUrl} != null and !#strings.isEmpty(grafanaUrl)"
+          th:href="${grafanaUrl}"
+          class="btn btn-outline-light btn-sm"
+          target="_blank"
+          rel="noopener"
+          >Ver en Grafana</a
+        >
       </div>
     </nav>
     <main class="container-fluid mt-3">

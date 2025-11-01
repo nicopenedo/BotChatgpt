@@ -84,6 +84,11 @@ public class RiskGuard {
     meterRegistry.gauge("risk.ws_reconnects", Tags.empty(), wsReconnectGauge, AtomicInteger::get);
     meterRegistry.gauge("bot.mode", Tags.empty(), modeGauge, AtomicInteger::get);
     meterRegistry.gauge("risk.market_data_stale", Tags.empty(), marketDataGauge, AtomicInteger::get);
+    meterRegistry.gauge(
+        "risk.daily_loss.limit_pct",
+        Tags.empty(),
+        riskProperties,
+        props -> props.getMaxDailyLossPct() != null ? props.getMaxDailyLossPct().doubleValue() : 0.0);
     updateModeGauge();
   }
 

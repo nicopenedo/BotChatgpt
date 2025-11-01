@@ -1,0 +1,120 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "datasource", "uid": "grafana"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {
+          "expr": "increase(research_nightly_runs_total{app=\"bot-trading\"}[7d])",
+          "legendFormat": "runs"
+        }
+      ],
+      "title": "Corridas Nocturnas (7d)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "seconds"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(research_nightly_stage_duration_seconds_bucket{app=\"bot-trading\"}[7d])) by (stage, le))",
+          "legendFormat": "p95 {{stage}}"
+        }
+      ],
+      "title": "Duración p95 por Etapa",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "seconds"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single"}},
+      "targets": [
+        {
+          "expr": "sum(rate(research_nightly_stage_duration_seconds_sum{app=\"bot-trading\"}[1d])) / sum(rate(research_nightly_stage_duration_seconds_count{app=\"bot-trading\"}[1d]))",
+          "legendFormat": "promedio"
+        }
+      ],
+      "title": "Tiempo Medio por Etapa (24h)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "rate(research_nightly_candidates_total{app=\"bot-trading\",status=\"eligible\"}[7d])",
+          "legendFormat": "eligible"
+        },
+        {
+          "expr": "rate(research_nightly_candidates_total{app=\"bot-trading\",status=\"rejected\"}[7d])",
+          "legendFormat": "rejected"
+        }
+      ],
+      "title": "Candidates por Día (7d)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "seconds"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": false},
+      "targets": [
+        {"expr": "research_nightly_last_duration_seconds{app=\"bot-trading\"}", "legendFormat": "last"}
+      ],
+      "title": "Última Duración",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource:Prometheus}"},
+      "fieldConfig": {"defaults": {"unit": "seconds"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "sum(rate(research_nightly_stage_duration_seconds_sum{app=\"bot-trading\"}[7d])) by (stage)",
+          "legendFormat": "{{stage}}"
+        }
+      ],
+      "title": "Tiempo Total por Etapa (7d)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["bot-trading", "research"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "Research Nightly",
+  "uid": null,
+  "version": 1
+}

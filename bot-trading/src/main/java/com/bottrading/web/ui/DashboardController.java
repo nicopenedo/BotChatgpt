@@ -1,6 +1,7 @@
 package com.bottrading.web.ui;
 
 import com.bottrading.config.TradingProps;
+import com.bottrading.config.UiProperties;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -16,9 +17,11 @@ public class DashboardController {
   private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
 
   private final TradingProps tradingProps;
+  private final UiProperties uiProperties;
 
-  public DashboardController(TradingProps tradingProps) {
+  public DashboardController(TradingProps tradingProps, UiProperties uiProperties) {
     this.tradingProps = tradingProps;
+    this.uiProperties = uiProperties;
   }
 
   @GetMapping("/ui/dashboard")
@@ -40,6 +43,7 @@ public class DashboardController {
     model.addAttribute(
         "defaultFrom",
         from != null ? from : ISO.format(now.minusSeconds(7 * 24 * 3600)));
+    model.addAttribute("grafanaUrl", uiProperties.getGrafanaUrl());
     return "dashboard";
   }
 }
