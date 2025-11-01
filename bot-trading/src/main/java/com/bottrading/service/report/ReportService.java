@@ -2,6 +2,9 @@ package com.bottrading.service.report;
 
 import com.bottrading.model.dto.report.AnnotationDto;
 import com.bottrading.model.dto.report.HeatmapResponse;
+import com.bottrading.model.dto.report.PnlAttributionGroup;
+import com.bottrading.model.dto.report.PnlAttributionMetrics;
+import com.bottrading.model.dto.report.PnlAttributionSymbolStats;
 import com.bottrading.model.dto.report.SummaryBucket;
 import com.bottrading.model.dto.report.TimePoint;
 import com.bottrading.model.dto.report.TradeDto;
@@ -29,4 +32,10 @@ public interface ReportService {
   List<AnnotationDto> annotations(String symbol, Instant from, Instant to, boolean includeAdvanced);
 
   HeatmapResponse heatmap(String symbol, Instant from, Instant to, String bucket);
+
+  List<PnlAttributionGroup> pnlAttributionBreakdown(String symbol, Instant from, Instant to);
+
+  List<PnlAttributionSymbolStats> pnlAttributionSymbolStats(String symbol, Instant from, Instant to);
+
+  PnlAttributionMetrics pnlAttributionMetrics(String symbol, Instant from, Instant to);
 }

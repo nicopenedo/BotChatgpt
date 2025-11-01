@@ -14,6 +14,7 @@ import com.bottrading.repository.ManagedOrderRepository;
 import com.bottrading.repository.PositionRepository;
 import com.bottrading.repository.TradeRepository;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.report.PnlAttributionService;
 import com.bottrading.service.risk.drift.DriftWatchdog;
 import com.bottrading.util.IdGenerator;
 import io.micrometer.core.instrument.Counter;
@@ -57,6 +58,7 @@ public class PositionManager {
   private final Counter ordersCanceled;
   private final Counter ocoCorrections;
   private final DriftWatchdog driftWatchdog;
+  private final PnlAttributionService pnlAttributionService;
   private final ConcurrentMap<Long, ReentrantLock> positionLocks = new ConcurrentHashMap<>();
 
   public PositionManager(
@@ -69,7 +71,8 @@ public class PositionManager {
       PositionManagerProperties positionManagerProperties,
       MeterRegistry meterRegistry,
       Optional<Clock> clock,
-      DriftWatchdog driftWatchdog) {
+      DriftWatchdog driftWatchdog,
+      PnlAttributionService pnlAttributionService) {
     this.positionRepository = positionRepository;
     this.managedOrderRepository = managedOrderRepository;
     this.tradeRepository = tradeRepository;
@@ -85,6 +88,7 @@ public class PositionManager {
     this.ordersCanceled = meterRegistry.counter("orders.canceled");
     this.ocoCorrections = meterRegistry.counter("oco.corrections");
     this.driftWatchdog = driftWatchdog;
+    this.pnlAttributionService = pnlAttributionService;
   }
 
   @Transactional
@@ -229,12 +233,14 @@ public class PositionManager {
     trade.setPrice(price);
     trade.setSide(order.getSide());
     trade.setExecutedAt(Instant.now(clock));
-    tradeRepository.save(trade);
+    TradeEntity savedTrade = tradeRepository.save(trade);
 
     BigDecimal incrementalPnl = incrementalPnl(position, lastFilled, price);
     if (incrementalPnl != null) {
       driftWatchdog.recordLiveTrade(position.getSymbol(), incrementalPnl.doubleValue());
     }
+
+    pnlAttributionService.record(position, savedTrade);
 
     ManagedOrderType type = order.getType();
     if (type == ManagedOrderType.TAKE_PROFIT) {

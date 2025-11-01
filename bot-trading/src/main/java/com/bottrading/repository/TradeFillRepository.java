@@ -20,4 +20,6 @@ public interface TradeFillRepository extends JpaRepository<TradeFillEntity, Long
       @Param("to") Instant to);
 
   List<TradeFillEntity> findTop200BySymbolOrderByExecutedAtDesc(String symbol);
+
+  TradeFillEntity findTopByOrderIdOrderByExecutedAtDesc(String orderId);
 }

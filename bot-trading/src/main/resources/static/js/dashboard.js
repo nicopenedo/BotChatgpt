@@ -67,6 +67,14 @@
       armsBody: document.querySelector('#banditArmsTable tbody'),
       pullsBody: document.querySelector('#banditPullsTable tbody')
     },
+    pnlAttr: {
+      chart: document.getElementById('pnlAttrChart'),
+      slippageAvg: document.getElementById('pnlAttrSlippageAvg'),
+      timingAvg: document.getElementById('pnlAttrTimingAvg'),
+      feesAvg: document.getElementById('pnlAttrFeesAvg'),
+      tableBody: document.querySelector('#pnlAttrSymbolTable tbody'),
+      meta: document.getElementById('pnlAttrMeta')
+    },
     varSnapshotsBody: document.querySelector('#varSnapshots tbody'),
     varSnapshotMeta: document.getElementById('varSnapshotMeta')
   };
@@ -176,6 +184,7 @@
   let drawdownChart;
   let heatmapInstance;
   let anomalyChart;
+  let pnlAttrChart;
 
   const crosshairPlugin = {
     id: 'crosshair-sync',
@@ -259,6 +268,9 @@
     } else {
       requests.push(Promise.resolve({ data: [] }));
     }
+    requests.push(axios.get('/api/reports/pnl-attr/breakdown', { params: base }));
+    requests.push(axios.get('/api/reports/pnl-attr/stats', { params: base }));
+    requests.push(axios.get('/api/reports/pnl-attr/metrics', { params: base }));
     requests.push(axios.get('/api/regime/status', { params: { symbol: params.symbol } }));
     requests.push(axios.get('/api/status/overview', { params: { symbol: params.symbol } }));
     requests.push(
@@ -283,6 +295,9 @@
       anchoredVwapRes,
       atrRes,
       supertrendRes,
+      pnlAttrBreakdownRes,
+      pnlAttrStatsRes,
+      pnlAttrMetricsRes,
       regimeStatusRes,
       overviewRes,
       tcaRes,
@@ -309,6 +324,9 @@
     renderSummary(summaryRes.data || []);
     renderHeatmap(heatmapRes.data);
     renderVarSnapshots(varSnapshotsRes?.data || []);
+    renderPnlAttributionChart(pnlAttrBreakdownRes?.data || []);
+    renderPnlAttrStats(pnlAttrStatsRes?.data || []);
+    renderPnlAttrMetrics(pnlAttrMetricsRes?.data, params.symbol);
 
     const markerData = buildMarkers(annotations);
     if (priceChart) priceChart.destroy();
@@ -555,12 +573,112 @@
         <td>${fmt(t.price)}</td>
         <td>${fmt(t.quantity)}</td>
         <td>${fmt(t.fee)}</td>
+        <td>${fmt(t.feesBps)}</td>
         <td>${fmt(t.pnl)}</td>
+        <td>${fmt(t.pnlNet)}</td>
+        <td>${fmt(t.signalEdge)}</td>
         <td>${fmt(t.pnlR)}</td>
         <td>${fmt(t.slippageBps)}</td>
+        <td>${fmt(t.slippageCost)}</td>
+        <td>${fmt(t.timingBps)}</td>
+        <td>${fmt(t.timingCost)}</td>
         <td>${escape(t.decisionNote)}</td>
       </tr>`);
     elements.tradesTable.innerHTML = rows.join('');
+  }
+
+  function renderPnlAttributionChart(groups) {
+    const canvas = elements.pnlAttr.chart;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const labels = groups.map((g) => `${g.preset || 'N/A'} · ${g.regime || 'N/A'}`);
+    const signal = groups.map((g) => Number(g.signalEdge ?? 0));
+    const timing = groups.map((g) => Number(g.timingCost ?? 0) * -1);
+    const slippage = groups.map((g) => Number(g.slippageCost ?? 0) * -1);
+    const fees = groups.map((g) => Number(g.feesCost ?? 0) * -1);
+    const net = groups.map((g) => Number(g.pnlNet ?? 0));
+    const totalTrades = groups.reduce((sum, g) => sum + (g.trades ?? 0), 0);
+    if (elements.pnlAttr.meta) {
+      elements.pnlAttr.meta.textContent = totalTrades ? `${totalTrades} trades` : '--';
+    }
+    if (pnlAttrChart) pnlAttrChart.destroy();
+    pnlAttrChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Signal Edge', data: signal, backgroundColor: '#16a34a' },
+          { label: 'Timing Cost', data: timing, backgroundColor: '#f59e0b' },
+          { label: 'Slippage Cost', data: slippage, backgroundColor: '#ef4444' },
+          { label: 'Fees', data: fees, backgroundColor: '#0ea5e9' },
+          {
+            label: 'Net PnL',
+            data: net,
+            type: 'line',
+            borderColor: '#1f2937',
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true }
+        },
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+
+  function renderPnlAttrStats(stats) {
+    const tbody = elements.pnlAttr.tableBody;
+    if (!tbody) return;
+    if (!Array.isArray(stats) || !stats.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-muted">No attribution data</td></tr>';
+      return;
+    }
+    const rows = stats.map((s) => `
+      <tr>
+        <td>${s.symbol}</td>
+        <td>${fmt(s.avgSlippageBps)}</td>
+        <td>${fmt(s.worstSlippageBps)}</td>
+        <td>${fmt(s.bestSlippageBps)}</td>
+        <td>${fmt(s.avgTimingBps)}</td>
+        <td>${fmt(s.worstTimingBps)}</td>
+        <td>${fmt(s.bestTimingBps)}</td>
+        <td>${fmt(s.netPnl)}</td>
+      </tr>`);
+    tbody.innerHTML = rows.join('');
+  }
+
+  function renderPnlAttrMetrics(metrics, symbol) {
+    const refs = elements.pnlAttr;
+    if (!refs || !metrics) {
+      if (refs) {
+        refs.slippageAvg.textContent = '--';
+        refs.timingAvg.textContent = '--';
+        refs.feesAvg.textContent = '--';
+      }
+      return;
+    }
+    const slippageMap = metrics.slippageAvgBpsBySymbol || {};
+    let slippageValue = null;
+    if (symbol && slippageMap[symbol] !== undefined) {
+      slippageValue = slippageMap[symbol];
+    } else {
+      const values = Object.values(slippageMap).filter((v) => Number.isFinite(v));
+      slippageValue = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    }
+    refs.slippageAvg.textContent = slippageValue !== null ? fmt(slippageValue) : '--';
+    refs.timingAvg.textContent = Number.isFinite(metrics.timingAvgBps) ? fmt(metrics.timingAvgBps) : '--';
+    refs.feesAvg.textContent = Number.isFinite(metrics.feesAvgBps) ? fmt(metrics.feesAvgBps) : '--';
   }
 
   function renderSummary(summary) {
@@ -1057,7 +1175,10 @@
 
   function fmt(value) {
     if (value === null || value === undefined) return '--';
-    if (typeof value === 'number') return value.toFixed(2);
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return '--';
+      return value.toFixed(2);
+    }
     if (typeof value === 'string') return value;
     if (value instanceof Object && 'toString' in value) return value.toString();
     return `${value}`;
