@@ -3,7 +3,8 @@ package com.bottrading.web;
 import com.bottrading.config.TradingProps;
 import com.bottrading.service.health.HealthService;
 import com.bottrading.service.health.HealthService.HealthStatus;
-import com.bottrading.service.risk.TradingState;
+import com.bottrading.service.risk.RiskGuard;
+import com.bottrading.service.risk.RiskState;
 import com.bottrading.service.risk.drift.DriftWatchdog;
 import com.bottrading.service.risk.drift.DriftWatchdog.Status;
 import com.bottrading.service.trading.AllocatorService;
@@ -22,19 +23,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class StatusController {
 
   private final TradingProps tradingProps;
-  private final TradingState tradingState;
+  private final RiskGuard riskGuard;
   private final AllocatorService allocatorService;
   private final DriftWatchdog driftWatchdog;
   private final HealthService healthService;
 
   public StatusController(
       TradingProps tradingProps,
-      TradingState tradingState,
+      RiskGuard riskGuard,
       AllocatorService allocatorService,
       DriftWatchdog driftWatchdog,
       HealthService healthService) {
     this.tradingProps = tradingProps;
-    this.tradingState = tradingState;
+    this.riskGuard = riskGuard;
     this.allocatorService = allocatorService;
     this.driftWatchdog = driftWatchdog;
     this.healthService = healthService;
@@ -49,9 +50,11 @@ public class StatusController {
     Status driftStatus = driftWatchdog.status();
     HealthStatus healthStatus = healthService.status();
     Map<String, Object> trading = new HashMap<>();
-    trading.put("mode", tradingState.getMode().name());
-    trading.put("killSwitch", tradingState.isKillSwitchActive());
-    trading.put("liveEnabled", tradingProps.isLiveEnabled() && tradingState.isLiveEnabled());
+    RiskState riskState = riskGuard.getState();
+    trading.put("mode", riskState.mode().name());
+    trading.put("killSwitch", riskState.mode().isPaused());
+    trading.put("liveEnabled", tradingProps.isLiveEnabled() && riskState.mode().isLive());
+    trading.put("riskFlags", riskState.flags());
     return ResponseEntity.ok(
         Map.of(
             "symbol", effective,

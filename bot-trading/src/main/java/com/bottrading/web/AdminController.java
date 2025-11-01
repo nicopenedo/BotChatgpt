@@ -2,8 +2,9 @@ package com.bottrading.web;
 
 import com.bottrading.config.TradingProps;
 import com.bottrading.service.health.HealthService;
-import com.bottrading.service.risk.TradingState;
-import com.bottrading.service.risk.TradingState.Mode;
+import com.bottrading.service.risk.RiskGuard;
+import com.bottrading.service.risk.RiskMode;
+import com.bottrading.service.risk.RiskState;
 import com.bottrading.service.risk.drift.DriftWatchdog;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -19,17 +20,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/admin")
 public class AdminController {
 
-  private final TradingState tradingState;
+  private final RiskGuard riskGuard;
   private final TradingProps tradingProperties;
   private final DriftWatchdog driftWatchdog;
   private final HealthService healthService;
 
   public AdminController(
-      TradingState tradingState,
+      RiskGuard riskGuard,
       TradingProps tradingProperties,
       DriftWatchdog driftWatchdog,
       HealthService healthService) {
-    this.tradingState = tradingState;
+    this.riskGuard = riskGuard;
     this.tradingProperties = tradingProperties;
     this.driftWatchdog = driftWatchdog;
     this.healthService = healthService;
@@ -38,21 +39,21 @@ public class AdminController {
   @PostMapping("/kill-switch")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Map<String, Object>> activateKillSwitch() {
-    tradingState.activateKillSwitch();
-    return ResponseEntity.ok(Map.of("killSwitch", true));
+    riskGuard.setMode(RiskMode.PAUSED);
+    return ResponseEntity.ok(Map.of("mode", "paused"));
   }
 
   @PostMapping("/resume")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Map<String, Object>> resume() {
-    tradingState.deactivateKillSwitch();
-    return ResponseEntity.ok(Map.of("killSwitch", false));
+    riskGuard.setMode(RiskMode.LIVE);
+    return ResponseEntity.ok(Map.of("mode", "live"));
   }
 
   @GetMapping("/live-enabled")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Map<String, Object>> liveEnabled() {
-    boolean enabled = tradingState.isLiveEnabled() && tradingProperties.isLiveEnabled();
+    boolean enabled = tradingProperties.isLiveEnabled() && riskGuard.getState().mode().isLive();
     return ResponseEntity.ok(Map.of("liveEnabled", enabled));
   }
 
@@ -72,19 +73,27 @@ public class AdminController {
   @PostMapping("/mode/{mode}")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Map<String, Object>> setMode(@PathVariable String mode) {
-    Mode target;
+    RiskMode target;
     try {
-      target = Mode.valueOf(mode.toUpperCase());
+      target = RiskMode.valueOf(mode.toUpperCase());
     } catch (IllegalArgumentException ex) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid mode"));
     }
-    tradingState.setMode(target);
-    if (target == Mode.PAUSED) {
-      tradingState.activateKillSwitch();
-    } else if (target == Mode.LIVE) {
-      tradingState.deactivateKillSwitch();
-    }
+    riskGuard.setMode(target);
     return ResponseEntity.ok(Map.of("mode", target.name().toLowerCase()));
+  }
+
+  @GetMapping("/risk/status")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<RiskState> riskStatus() {
+    return ResponseEntity.ok(riskGuard.getState());
+  }
+
+  @PostMapping("/risk/ack")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Void> acknowledgeRisk() {
+    riskGuard.acknowledge();
+    return ResponseEntity.ok().build();
   }
 
   @PostMapping("/health/reset")

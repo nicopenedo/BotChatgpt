@@ -55,7 +55,7 @@ public class OrderService {
     String symbol = request.getSymbol() != null ? request.getSymbol() : tradingProperties.getSymbol();
     request.setSymbol(symbol);
 
-    if (!riskGuard.canTrade()) {
+    if (!riskGuard.canOpen(symbol)) {
       throw new IllegalStateException("Risk guard prevents trading. Cooldown active.");
     }
 
@@ -67,13 +67,19 @@ public class OrderService {
       return simulateOrder(request);
     }
 
-    OrderResponse response = binanceClient.placeOrder(request);
-    persistOrder(response, request);
-    ordersSent.increment();
-    if (response.executedQty().compareTo(BigDecimal.ZERO) > 0) {
-      ordersFilled.increment();
+    try {
+      OrderResponse response = binanceClient.placeOrder(request);
+      riskGuard.onApiSuccess();
+      persistOrder(response, request);
+      ordersSent.increment();
+      if (response.executedQty().compareTo(BigDecimal.ZERO) > 0) {
+        ordersFilled.increment();
+      }
+      return response;
+    } catch (RuntimeException ex) {
+      riskGuard.onApiError();
+      throw ex;
     }
-    return response;
   }
 
   public OrderResponse getOrder(String symbol, String orderId) {

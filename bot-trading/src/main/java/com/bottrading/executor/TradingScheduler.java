@@ -314,7 +314,7 @@ public class TradingScheduler {
     if (tradingState.isKillSwitchActive()) {
       return GateResult.blocked("KILL_SWITCH", 0);
     }
-    if (!riskGuard.canTrade()) {
+    if (!riskGuard.canOpen(context.symbol())) {
       return GateResult.blocked("RISK_GUARD", 0);
     }
     if (!withinTradingWindow(context.decidedAt())) {

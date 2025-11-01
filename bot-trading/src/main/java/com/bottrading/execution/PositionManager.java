@@ -370,6 +370,23 @@ public class PositionManager {
   }
 
   @Transactional
+  public void forceCloseAll() {
+    positionRepository
+        .findByStatus(PositionStatus.OPEN)
+        .forEach(
+            position -> {
+              try {
+                closePosition(position);
+              } catch (Exception ex) {
+                log.warn(
+                    "Failed to force close position {}: {}",
+                    position.getId(),
+                    ex.getMessage());
+              }
+            });
+  }
+
+  @Transactional
   public ReconciliationReport reconcile(Collection<ExternalOrderSnapshot> snapshots) {
     int adopted = 0;
     int cancelled = 0;
