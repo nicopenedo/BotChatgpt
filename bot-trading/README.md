@@ -29,6 +29,62 @@ Este proyecto provee un bot de scalping para Binance Spot construido con Spring 
 - **Drift & Health Watchdog**: compara live vs shadow/expected, aplica degradaciones automáticas y pausa si hay problemas de conectividad/API.
 - **TCA Service**: registra slippage en bps, colas y recomienda LIMIT/MARKET según condiciones reales.
 
+## Gestión de presets y promoción
+El bot incorpora un pipeline completo de versionado y promoción de presets por régimen (`UP/DOWN/RANGE`) y `side` (`BUY/SELL`). Cada import del GA crea una `PresetVersion` candidata con trazabilidad a la corrida (`BacktestRun`) y hashes de código/datos/labels para reproducibilidad. El `PresetService` aplica la política de promoción configurable (`PF`, `MaxDD`, trades mínimos y chequeo Shadow) antes de activar un preset en modo **canary** o **full**. El `StrategyRouter` consulta siempre la versión `active` para enrutar la estrategia correspondiente, y los cambios se reflejan en caliente.
+
+### Flujo recomendado
+1. **Importar** preset generado por el GA (`/api/presets/import` o CLI `presets import`).
+2. **Evaluar** métricas OOS/Shadow en el dashboard o vía `EvaluationSnapshot`.
+3. **Promover** a canary (`PF` ≥ baseline, DD ≤ cap, trades ≥ mínimo). Si supera los stages de riesgo (`0.5 → 0.75 → 1.0`) se activa automáticamente.
+4. **Snapshot** periódico (`/api/presets/{id}/snapshot-live`) para registrar KPIs live/shadow.
+5. **Leaderboard** (`/ui/presets/leaderboard` o CLI `leaderboard`) para comparar candidatos y activos.
+6. **Rollback** inmediato a la versión activa previa si los KPIs live rompen los límites.
+
+### API clave (rol `ADMIN`)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `GET` | `/api/presets?regime=&side=&status=` | Lista versiones filtradas con paginado opcional. |
+| `POST` | `/api/presets/import` | Multipart (`params`, `signals`, `metrics`) + metadatos `runId`, etc. Crea `candidate`. |
+| `POST` | `/api/presets/{id}/activate?mode=canary|full` | Aplica política y activa versión. |
+| `POST` | `/api/presets/{id}/retire` | Marca `retired` y registra auditoría. |
+| `POST` | `/api/presets/{id}/rollback` | Reactiva la última versión `active` conocida. |
+| `GET` | `/api/leaderboard?regime=&window=&minTrades=&maxDD=` | Ranking OOS/Shadow/Live filtrable. |
+| `GET` | `/api/presets/{id}/snapshots` | Historial de `EvaluationSnapshot`. |
+| `POST` | `/api/presets/{id}/snapshot-live?window=30d` | Registra KPIs live/shadow en JSON. |
+
+### CLI (Picocli)
+Los comandos se ejecutan vía `java -jar bot-trading.jar <command>`:
+
+```bash
+java -jar bot-trading.jar presets import \
+  --run-id RUN_GA_20241015 --regime UP --side BUY \
+  --params ./preset_up_buy.yaml --metrics ./metrics_oos.json
+java -jar bot-trading.jar presets promote --preset-id 4d3d... --mode canary
+java -jar bot-trading.jar presets retire --preset-id 4d3d...
+java -jar bot-trading.jar presets rollback --regime UP --side BUY
+java -jar bot-trading.jar presets snapshot-live --preset-id 4d3d... --window 30d --live ./live.json
+java -jar bot-trading.jar leaderboard --regime RANGE --window OOS_90D --min-trades 150 --maxdd 8
+```
+
+### Ejemplos `curl`
+```bash
+curl -u admin:*** -F regime=UP -F side=BUY \
+  -F params=@preset_up_buy.yaml -F metrics=@metrics_oos.json \
+  http://localhost:8080/api/presets/import
+curl -u admin:*** -X POST \
+  "http://localhost:8080/api/presets/{id}/activate?mode=canary"
+curl -u admin:*** -X POST \
+  "http://localhost:8080/api/presets/{id}/snapshot-live?window=30d" \
+  -H 'Content-Type: application/json' \
+  -d '{"liveMetrics":{"PF":1.8,"Trades":60}}'
+```
+
+### Leaderboard y dashboard
+La vista `/ui/presets/leaderboard` permite comparar presets por régimen/ventana, aplicar filtros (`minTrades`, `maxDD`) y ejecutar acciones (Activate/Canary/Retire/Rollback). El detalle `/ui/presets/{id}` muestra snapshots OOS/Shadow/Live, tracking en vivo (PF, MaxDD, trades, slippage) y los JSON/YAML importados para auditoría rápida.
+
+### Persistencia
+Las migraciones `V7__preset_versioning.sql` y `V8__leaderboard_views.sql` crean las tablas `preset_versions`, `backtest_runs`, `evaluation_snapshots`, `live_tracking` e índices por `regime/side/status`. Los hashes (`code_sha`, `data_hash`, `labels_hash`) habilitan reproducibilidad y auditoría completa.
+
 ## Requisitos previos
 - Java 21
 - Maven 3.9+

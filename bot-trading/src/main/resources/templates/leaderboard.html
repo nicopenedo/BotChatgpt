@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Preset Leaderboard</title>
+    <link rel="stylesheet" th:href="@{/css/dashboard.css}" />
+    <style>
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.5rem; border-bottom: 1px solid #ccc; text-align: left; }
+        .actions form { display: inline; }
+    </style>
+</head>
+<body>
+<h1>Preset Leaderboard</h1>
+<form method="get" th:action="@{/ui/presets/leaderboard}">
+    <label>Regime
+        <select name="regime">
+            <option value="" th:selected="${selectedRegime == null}">All</option>
+            <option th:each="regime : ${regimes}"
+                    th:value="${regime}"
+                    th:text="${regime}"
+                    th:selected="${selectedRegime == regime.name()}">
+            </option>
+        </select>
+    </label>
+    <label>Side
+        <select name="side">
+            <option value="" th:selected="${selectedSide == null}">All</option>
+            <option th:each="sideItem : ${sides}"
+                    th:value="${sideItem}"
+                    th:text="${sideItem}"
+                    th:selected="${selectedSide == sideItem.name()}">
+            </option>
+        </select>
+    </label>
+    <label>Window
+        <select name="window">
+            <option th:each="windowItem : ${windows}"
+                    th:value="${windowItem}"
+                    th:text="${windowItem}"
+                    th:selected="${selectedWindow == windowItem.name()}">
+            </option>
+        </select>
+    </label>
+    <label>Min trades <input type="number" name="minTrades" th:value="${minTrades}" /></label>
+    <label>Max DD <input type="number" step="0.1" name="maxDD" th:value="${maxDD}" /></label>
+    <button type="submit">Filter</button>
+</form>
+<table>
+    <thead>
+    <tr>
+        <th>Preset</th>
+        <th>Status</th>
+        <th>PF</th>
+        <th>WinRate</th>
+        <th>MaxDD</th>
+        <th>Trades</th>
+        <th>Sharpe</th>
+        <th>Window</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="entry : ${entries}">
+        <td>
+            <a th:href="@{'/ui/presets/' + ${entry.preset.id}}"
+               th:text="${entry.preset.id}"></a>
+        </td>
+        <td th:text="${entry.preset.status}"></td>
+        <td th:text="${#numbers.formatDecimal(entry.profitFactor, 1, 2)}"></td>
+        <td th:text="${entry.metrics['WinRate'] ?: '-'}"></td>
+        <td th:text="${#numbers.formatDecimal(entry.maxDrawdown, 1, 2)}"></td>
+        <td th:text="${#numbers.formatDecimal(entry.trades, 1, 0)}"></td>
+        <td th:text="${entry.metrics['Sharpe'] ?: '-'}"></td>
+        <td th:text="${entry.window}"></td>
+        <td class="actions">
+            <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/activate'}" method="post">
+                <input type="hidden" name="mode" value="full" />
+                <button type="submit">Activate</button>
+            </form>
+            <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/activate'}" method="post">
+                <input type="hidden" name="mode" value="canary" />
+                <button type="submit">Canary</button>
+            </form>
+            <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/retire'}" method="post">
+                <button type="submit">Retire</button>
+            </form>
+            <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/rollback'}" method="post">
+                <button type="submit">Rollback</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>
