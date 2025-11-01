@@ -1,5 +1,6 @@
 package com.bottrading.research.backtest;
 
+import com.bottrading.research.regime.RegimeFilter;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -17,4 +18,5 @@ public record BacktestRequest(
     boolean useDynamicFees,
     Long seed,
     String runId,
-    boolean useCache) {}
+    boolean useCache,
+    RegimeFilter regimeFilter) {}

@@ -10,11 +10,12 @@ import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyContext;
 import com.bottrading.strategy.StrategyFactory;
 import com.bottrading.research.io.DataLoader;
-import java.io.IOException;
+import com.bottrading.research.regime.RegimeFilter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.security.MessageDigest;
@@ -46,6 +47,7 @@ public class BacktestEngine {
       throws IOException {
     List<Kline> klines =
         dataLoader.load(request.symbol(), request.interval(), request.from(), request.to(), request.useCache());
+    klines = applyRegimeFilter(klines, request.regimeFilter());
     if (klines == null || klines.isEmpty()) {
       throw new IllegalArgumentException("No klines available for backtest");
     }
@@ -105,6 +107,20 @@ public class BacktestEngine {
       reportWriter.write(reportDirectory, result);
     }
     return result;
+  }
+
+  private List<Kline> applyRegimeFilter(List<Kline> klines, RegimeFilter filter) {
+    if (filter == null || !filter.isActive() || klines == null || klines.isEmpty()) {
+      return klines;
+    }
+    List<Kline> filtered = new ArrayList<>();
+    for (Kline kline : klines) {
+      Instant ts = kline.closeTime() != null ? kline.closeTime() : kline.openTime();
+      if (ts != null && filter.allows(ts)) {
+        filtered.add(kline);
+      }
+    }
+    return filtered;
   }
 
   private CompositeStrategy resolveStrategy(BacktestRequest request, CompositeStrategy override) {

@@ -105,6 +105,16 @@ public class Genome {
     return new Genome(copy, buyThreshold, sellThreshold);
   }
 
+  public int activeSignals() {
+    int count = 0;
+    for (Gene gene : genes.values()) {
+      if (gene.enabled) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   public void mutate(Random random, double mutationRate) {
     for (Gene gene : genes.values()) {
       if (random.nextDouble() < mutationRate) {

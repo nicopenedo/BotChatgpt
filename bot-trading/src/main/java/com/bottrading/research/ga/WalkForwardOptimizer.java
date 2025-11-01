@@ -57,7 +57,62 @@ public class WalkForwardOptimizer {
               base.useDynamicFees(),
               base.seed(),
               base.runId(),
-              base.useCache()));
+              base.useCache(),
+              base.regimeFilter()));
+    }
+    return segments;
+  }
+
+  public static List<BacktestRequest> splitByRegime(
+      BacktestRequest base,
+      int trainDays,
+      int validationDays,
+      int testDays,
+      com.bottrading.research.regime.RegimeFilter regimeFilter,
+      int minSamples) {
+    if (regimeFilter == null || !regimeFilter.isActive()) {
+      return split(base, trainDays, validationDays, testDays);
+    }
+    if (base.from() == null || base.to() == null) {
+      return List.of(base);
+    }
+    List<BacktestRequest> segments = new ArrayList<>();
+    List<BacktestRequest> windows = split(base, trainDays, validationDays, testDays);
+    int index = 0;
+    for (BacktestRequest request : windows) {
+      java.time.Instant trainEnd = request.from().plus(java.time.Duration.ofDays(trainDays));
+      if (trainEnd.isAfter(request.to())) {
+        trainEnd = request.to();
+      }
+      java.time.Instant validationEnd = trainEnd.plus(java.time.Duration.ofDays(validationDays));
+      if (validationEnd.isAfter(request.to())) {
+        validationEnd = request.to();
+      }
+      long trainCount = regimeFilter.count(request.from(), trainEnd);
+      long validationCount = regimeFilter.count(trainEnd, validationEnd);
+      long testCount = regimeFilter.count(validationEnd, request.to());
+      if ((minSamples > 0 && (trainCount < minSamples || validationCount < minSamples || testCount < minSamples))
+          || trainCount == 0
+          || validationCount == 0
+          || testCount == 0) {
+        continue;
+      }
+      segments.add(
+          new BacktestRequest(
+              request.symbol(),
+              request.interval(),
+              request.from(),
+              request.to(),
+              request.strategyConfig(),
+              request.genomesConfig(),
+              request.slippageBps(),
+              request.takerFeeBps(),
+              request.makerFeeBps(),
+              request.useDynamicFees(),
+              request.seed(),
+              request.runId() + "-wf" + index++,
+              request.useCache(),
+              regimeFilter));
     }
     return segments;
   }

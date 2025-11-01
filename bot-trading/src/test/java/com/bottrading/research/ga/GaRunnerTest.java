@@ -65,8 +65,9 @@ class GaRunnerTest {
             false,
             null,
             "test",
-            false);
-    Evaluator evaluator = new Evaluator(engine, request, 1, Path.of("ga-test"));
+            false,
+            null);
+    Evaluator evaluator = new Evaluator(engine, request, 1, Path.of("ga-test"), 0.0, 0);
     GaRunner runner = new GaRunner(evaluator, 4, 2, 0.1, 2, 1, 42L);
     Genome best = runner.run();
     Assertions.assertNotNull(best);

@@ -72,7 +72,7 @@ public class StrategyFactory {
       current = fromDefaults();
       catalog = current;
     }
-    return current.routerRules();
+    return current.routerConfig().rules();
   }
 
   public StrategyCatalog getCatalog() {
@@ -146,8 +146,8 @@ public class StrategyFactory {
       }
     }
 
-    List<RouterRule> rules = parseRouterRules(rootMap.get("router"));
-    return Optional.of(new StrategyCatalog(presets, rules, "default"));
+    RouterConfig routerConfig = parseRouterConfig(rootMap.get("router"));
+    return Optional.of(new StrategyCatalog(presets, routerConfig, "default"));
   }
 
   private StrategyCatalog fromDefaults() {
@@ -160,7 +160,7 @@ public class StrategyFactory {
     strategy.addSignal(new RsiSignal(14, 30, 70, 50, 0.6), 0.8);
     strategy.addSignal(new BollingerBandsSignal(20, 2.0, 0.5), 0.6);
     Map<String, CompositeStrategy> presets = Map.of("default", strategy);
-    return new StrategyCatalog(presets, List.of(), "default");
+    return new StrategyCatalog(presets, new RouterConfig(List.of(), null, 1), "default");
   }
 
   @SuppressWarnings("unchecked")
@@ -320,28 +320,33 @@ public class StrategyFactory {
     return strategy;
   }
 
-  private List<RouterRule> parseRouterRules(Object routerConfig) {
+  private RouterConfig parseRouterConfig(Object routerConfig) {
     Map<String, Object> router = castMap(routerConfig);
     if (router == null) {
-      return List.of();
+      return new RouterConfig(List.of(), null, 1);
     }
     List<Map<String, Object>> rulesConfig = castList(router.get("rules"));
-    if (rulesConfig == null) {
-      return List.of();
-    }
     List<RouterRule> rules = new ArrayList<>();
-    for (Map<String, Object> ruleConfig : rulesConfig) {
-      Map<String, Object> when = castMap(ruleConfig.get("when"));
-      String preset = Optional.ofNullable(ruleConfig.get("use")).map(Object::toString).orElse("default");
-      RegimeTrend trend = null;
-      RegimeVolatility vol = null;
-      if (when != null) {
-        trend = parseTrend(when.get("trend"));
-        vol = parseVolatility(when.get("vol"));
+    if (rulesConfig != null) {
+      for (Map<String, Object> ruleConfig : rulesConfig) {
+        Map<String, Object> when = castMap(ruleConfig.get("when"));
+        String preset = Optional.ofNullable(ruleConfig.get("use")).map(Object::toString).orElse("default");
+        RegimeTrend trend = null;
+        RegimeVolatility vol = null;
+        if (when != null) {
+          trend = parseTrend(when.get("trend"));
+          vol = parseVolatility(when.get("vol"));
+        }
+        rules.add(new RouterRule(trend, vol, preset));
       }
-      rules.add(new RouterRule(trend, vol, preset));
     }
-    return List.copyOf(rules);
+    String fallback = Optional.ofNullable(router.get("fallback")).map(Object::toString).orElse(null);
+    int hysteresis = readInt(router.getOrDefault("hysteresis", 1), 1);
+    return new RouterConfig(List.copyOf(rules), fallback, Math.max(1, hysteresis));
+  }
+
+  private List<RouterRule> parseRouterRules(Object routerConfig) {
+    return parseRouterConfig(routerConfig).rules();
   }
 
   private RegimeTrend parseTrend(Object value) {
@@ -370,15 +375,17 @@ public class StrategyFactory {
 
   public record RouterRule(RegimeTrend trend, RegimeVolatility volatility, String preset) {}
 
+  public record RouterConfig(List<RouterRule> rules, String fallback, int hysteresis) {}
+
   public static final class StrategyCatalog {
     private final Map<String, CompositeStrategy> presets;
-    private final List<RouterRule> routerRules;
+    private final RouterConfig routerConfig;
     private final String defaultPreset;
 
     public StrategyCatalog(
-        Map<String, CompositeStrategy> presets, List<RouterRule> routerRules, String defaultPreset) {
+        Map<String, CompositeStrategy> presets, RouterConfig routerConfig, String defaultPreset) {
       this.presets = Map.copyOf(presets);
-      this.routerRules = List.copyOf(routerRules);
+      this.routerConfig = routerConfig;
       this.defaultPreset = defaultPreset;
     }
 
@@ -390,8 +397,8 @@ public class StrategyFactory {
       return presets;
     }
 
-    public List<RouterRule> routerRules() {
-      return routerRules;
+    public RouterConfig routerConfig() {
+      return routerConfig;
     }
 
     public String defaultPreset() {
