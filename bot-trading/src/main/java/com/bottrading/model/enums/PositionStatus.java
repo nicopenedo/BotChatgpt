@@ -1,9 +1,9 @@
 package com.bottrading.model.enums;
 
 public enum PositionStatus {
+  OPENING,
   OPEN,
-  STOP_HIT,
-  TAKE_PROFIT,
-  CANCELLED,
-  CLOSED
+  CLOSING,
+  CLOSED,
+  ERROR
 }

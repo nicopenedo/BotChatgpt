@@ -1,5 +1,6 @@
 package com.bottrading.model.entity;
 
+import com.bottrading.model.enums.ManagedOrderStatus;
 import com.bottrading.model.enums.ManagedOrderType;
 import com.bottrading.model.enums.OrderSide;
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ public class ManagedOrderEntity {
   @JoinColumn(name = "position_id")
   private PositionEntity position;
 
-  @Column(name = "client_order_id")
+  @Column(name = "client_order_id", unique = true)
   private String clientOrderId;
 
   @Enumerated(EnumType.STRING)
@@ -37,12 +38,20 @@ public class ManagedOrderEntity {
   private OrderSide side;
 
   private BigDecimal price;
+
+  @Column(name = "stop_price")
+  private BigDecimal stopPrice;
+
   private BigDecimal quantity;
 
   @Column(name = "filled_qty")
   private BigDecimal filledQuantity;
 
-  private String status;
+  @Enumerated(EnumType.STRING)
+  private ManagedOrderStatus status = ManagedOrderStatus.NEW;
+
+  @Column(name = "exchange_order_id")
+  private String exchangeOrderId;
 
   @Column(name = "created_at")
   private Instant createdAt;
@@ -98,6 +107,14 @@ public class ManagedOrderEntity {
     this.price = price;
   }
 
+  public BigDecimal getStopPrice() {
+    return stopPrice;
+  }
+
+  public void setStopPrice(BigDecimal stopPrice) {
+    this.stopPrice = stopPrice;
+  }
+
   public BigDecimal getQuantity() {
     return quantity;
   }
@@ -114,12 +131,20 @@ public class ManagedOrderEntity {
     this.filledQuantity = filledQuantity;
   }
 
-  public String getStatus() {
+  public ManagedOrderStatus getStatus() {
     return status;
   }
 
-  public void setStatus(String status) {
+  public void setStatus(ManagedOrderStatus status) {
     this.status = status;
+  }
+
+  public String getExchangeOrderId() {
+    return exchangeOrderId;
+  }
+
+  public void setExchangeOrderId(String exchangeOrderId) {
+    this.exchangeOrderId = exchangeOrderId;
   }
 
   public Instant getCreatedAt() {

@@ -1,8 +1,10 @@
 package com.bottrading.notify;
 
 import com.bottrading.config.TelegramProperties;
+import com.bottrading.model.enums.OrderSide;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +29,34 @@ public class TelegramNotifier {
     send("Fill %s %s qty=%s price=%s orderId=%s".formatted(symbol, side, qty, price, orderId));
   }
 
-  public void notifyStopHit(String symbol, com.bottrading.model.enums.OrderSide side, BigDecimal price, BigDecimal pnl) {
+  public void notifyPositionOpened(String symbol, OrderSide side, BigDecimal qty, BigDecimal entryPrice, String correlationId) {
+    send(
+        "Position opened %s %s qty=%s price=%s corrId=%s"
+            .formatted(symbol, side, qty, entryPrice, correlationId));
+  }
+
+  public void notifyPartialFill(String symbol, OrderSide side, BigDecimal qty, BigDecimal price, String clientOrderId) {
+    send(
+        "Partial fill %s %s qty=%s price=%s clientId=%s"
+            .formatted(symbol, side, qty, price, clientOrderId));
+  }
+
+  public void notifyStopHit(String symbol, OrderSide side, BigDecimal price, BigDecimal pnl) {
     send("Stop hit %s side=%s price=%s pnl=%s".formatted(symbol, side, price, pnl));
+  }
+
+  public void notifyTakeProfit(String symbol, OrderSide side, BigDecimal price, BigDecimal pnl) {
+    send("Take profit %s side=%s price=%s pnl=%s".formatted(symbol, side, price, pnl));
+  }
+
+  public void notifyOcoCorrected(String symbol, String primaryId, String secondaryId, Instant when) {
+    send(
+        "OCO corrected %s primary=%s secondary=%s at=%s"
+            .formatted(symbol, primaryId, secondaryId, when));
+  }
+
+  public void notifyReconciledItem(String symbol, String message) {
+    send("Reconciled %s -> %s".formatted(symbol, message));
   }
 
   public void notifyBreakeven(String symbol, BigDecimal price) {
@@ -67,9 +95,7 @@ public class TelegramNotifier {
       return;
     }
     try {
-      URI uri =
-          URI.create(
-              "https://api.telegram.org/bot" + properties.getBotToken() + "/sendMessage");
+      URI uri = URI.create("https://api.telegram.org/bot" + properties.getBotToken() + "/sendMessage");
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
       Map<String, Object> payload =

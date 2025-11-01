@@ -9,6 +9,7 @@ import com.bottrading.model.dto.Kline;
 import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.dto.PriceTicker;
+import com.bottrading.model.entity.ManagedOrderEntity;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
 import com.bottrading.util.IdGenerator;
@@ -27,6 +28,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -195,6 +198,51 @@ public class BinanceClientImpl implements BinanceClient {
     params.put("orderId", orderId);
     String response = execute(() -> spotClient.createTrade().getOrder(params));
     return mapOrderResponse(response);
+  }
+
+  @Override
+  public boolean placeOcoOrder(String symbol, ManagedOrderEntity stopLoss, ManagedOrderEntity takeProfit) {
+    throw new UnsupportedOperationException("OCO not implemented for Spot connector");
+  }
+
+  @Override
+  public void placeChildOrder(ManagedOrderEntity order) {
+    log.debug("Simulating placement of managed order {}", order.getClientOrderId());
+  }
+
+  @Override
+  public void cancelOrder(ManagedOrderEntity order) {
+    log.debug("Simulating cancel of managed order {}", order.getClientOrderId());
+  }
+
+  @Override
+  public List<ExchangeOrder> getOpenOrders(String symbol) {
+    return List.of();
+  }
+
+  @Override
+  public List<ExchangeOrder> getRecentOrders(String symbol, int lookbackMinutes) {
+    return List.of();
+  }
+
+  @Override
+  public String startUserDataStream() {
+    throw new UnsupportedOperationException("User data stream not configured");
+  }
+
+  @Override
+  public void keepAliveUserDataStream(String listenKey) {
+    log.debug("Skipping keepAlive for listenKey {}", listenKey);
+  }
+
+  @Override
+  public void closeUserDataStream(String listenKey) {
+    log.debug("Skipping close for listenKey {}", listenKey);
+  }
+
+  @Override
+  public void connectUserDataStream(String listenKey, Consumer<String> onMessage, Consumer<Throwable> onError) {
+    throw new UnsupportedOperationException("User data stream WS not implemented");
   }
 
   private OrderResponse mapOrderResponse(String response) {

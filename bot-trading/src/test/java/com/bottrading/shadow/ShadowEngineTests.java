@@ -76,7 +76,7 @@ class ShadowEngineTests {
 
     ShadowEngine.ShadowStatus status = engine.status("BTCUSDT");
     assertThat(status.shadowPnl()).isGreaterThan(BigDecimal.ZERO);
-    assertThat(stored).allMatch(p -> p.getStatus() == PositionStatus.TAKE_PROFIT);
+    assertThat(stored).allMatch(p -> p.getStatus() == PositionStatus.CLOSED);
   }
 
   @Test
@@ -85,7 +85,7 @@ class ShadowEngineTests {
     ShadowPositionEntity closed = new ShadowPositionEntity();
     closed.setId(idSeq.getAndIncrement());
     closed.setSymbol("ETHUSDT");
-    closed.setStatus(PositionStatus.TAKE_PROFIT);
+    closed.setStatus(PositionStatus.CLOSED);
     closed.setOpenedAt(Instant.now());
     stored.add(closed);
 

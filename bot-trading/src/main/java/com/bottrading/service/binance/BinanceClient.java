@@ -6,8 +6,10 @@ import com.bottrading.model.dto.Kline;
 import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.dto.PriceTicker;
+import com.bottrading.model.entity.ManagedOrderEntity;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface BinanceClient {
   PriceTicker getPrice(String symbol);
@@ -25,4 +27,31 @@ public interface BinanceClient {
   OrderResponse placeOrder(OrderRequest request);
 
   OrderResponse getOrder(String symbol, String orderId);
+
+  boolean placeOcoOrder(String symbol, ManagedOrderEntity stopLoss, ManagedOrderEntity takeProfit);
+
+  void placeChildOrder(ManagedOrderEntity order);
+
+  void cancelOrder(ManagedOrderEntity order);
+
+  List<ExchangeOrder> getOpenOrders(String symbol);
+
+  List<ExchangeOrder> getRecentOrders(String symbol, int lookbackMinutes);
+
+  String startUserDataStream();
+
+  void keepAliveUserDataStream(String listenKey);
+
+  void closeUserDataStream(String listenKey);
+
+  void connectUserDataStream(String listenKey, Consumer<String> onMessage, Consumer<Throwable> onError);
+
+  record ExchangeOrder(
+      String symbol,
+      String clientOrderId,
+      String exchangeOrderId,
+      String status,
+      BigDecimal executedQty,
+      BigDecimal price,
+      long updateTime) {}
 }
