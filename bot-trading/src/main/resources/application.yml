@@ -20,3 +20,13 @@ risk:
   forceCloseOnPause: true
   maxOpeningsPerDay: 10
   maxTradeNotional: 0
+throttle:
+  window1s: 1200
+  window60s: 72000
+  on429:
+    backoffMs: 500
+  on5xx:
+    backoffMs: 300
+  queue:
+    maxDepthPerSymbol: 100
+    maxDepthGlobal: 2000
