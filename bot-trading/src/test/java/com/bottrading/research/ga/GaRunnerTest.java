@@ -6,6 +6,7 @@ import com.bottrading.research.backtest.BacktestResult;
 import com.bottrading.research.backtest.EquityPoint;
 import com.bottrading.research.backtest.MetricsSummary;
 import com.bottrading.research.backtest.TradeRecord;
+import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.CompositeStrategy;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -31,13 +32,40 @@ class GaRunnerTest {
                 request,
                 metrics,
                 Collections.singletonList(
-                    new TradeRecord(Instant.now(), BigDecimal.ONE, Instant.now(), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, true)),
-                Collections.singletonList(new EquityPoint(Instant.now(), score)));
+                    new TradeRecord(
+                        Instant.now(),
+                        BigDecimal.ONE,
+                        Instant.now(),
+                        BigDecimal.ONE,
+                        BigDecimal.ONE,
+                        BigDecimal.ONE,
+                        true,
+                        SignalSide.BUY,
+                        "entry",
+                        "exit",
+                        Collections.emptyList(),
+                        Collections.emptyList())),
+                Collections.singletonList(new EquityPoint(Instant.now(), score)),
+                Collections.emptyList(),
+                "hash");
           }
         };
 
     BacktestRequest request =
-        new BacktestRequest("TEST", "1m", null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        new BacktestRequest(
+            "TEST",
+            "1m",
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            false,
+            null,
+            "test",
+            false);
     Evaluator evaluator = new Evaluator(engine, request, 1, Path.of("ga-test"));
     GaRunner runner = new GaRunner(evaluator, 4, 2, 0.1, 2, 1, 42L);
     Genome best = runner.run();

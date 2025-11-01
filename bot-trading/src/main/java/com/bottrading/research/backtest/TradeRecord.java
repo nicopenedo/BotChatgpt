@@ -1,7 +1,9 @@
 package com.bottrading.research.backtest;
 
+import com.bottrading.strategy.SignalSide;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public record TradeRecord(
     Instant entryTime,
@@ -10,4 +12,15 @@ public record TradeRecord(
     BigDecimal exitPrice,
     BigDecimal quantity,
     BigDecimal pnl,
-    boolean win) {}
+    boolean win,
+    SignalSide side,
+    String entryReason,
+    String exitReason,
+    List<String> entrySignals,
+    List<String> exitSignals) {
+
+  public TradeRecord {
+    entrySignals = entrySignals == null ? List.of() : List.copyOf(entrySignals);
+    exitSignals = exitSignals == null ? List.of() : List.copyOf(exitSignals);
+  }
+}

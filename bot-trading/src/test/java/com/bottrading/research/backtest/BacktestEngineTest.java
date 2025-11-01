@@ -46,7 +46,20 @@ class BacktestEngineTest {
     strategy.addSignal(new TestSignal(), 1.0);
 
     BacktestRequest request =
-        new BacktestRequest("TEST", "1m", null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        new BacktestRequest(
+            "TEST",
+            "1m",
+            null,
+            null,
+            null,
+            null,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            false,
+            null,
+            "test",
+            false);
     BacktestResult result = engine.run(request, null, strategy);
 
     Assertions.assertEquals(1, result.trades().size());

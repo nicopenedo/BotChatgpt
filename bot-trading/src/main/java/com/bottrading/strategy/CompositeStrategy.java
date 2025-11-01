@@ -18,7 +18,21 @@ public class CompositeStrategy {
     if (weight <= 0) {
       throw new IllegalArgumentException("weight must be positive");
     }
-    signals.add(new WeightedSignal(signal, weight));
+    signals.add(new WeightedSignal(signal, weight, weight, true, true));
+    return this;
+  }
+
+  public CompositeStrategy addSignalForSides(
+      Signal signal,
+      double buyWeight,
+      double sellWeight,
+      boolean buyEnabled,
+      boolean sellEnabled) {
+    Objects.requireNonNull(signal, "signal");
+    if (buyWeight < 0 || sellWeight < 0) {
+      throw new IllegalArgumentException("weights must be non-negative");
+    }
+    signals.add(new WeightedSignal(signal, buyWeight, sellWeight, buyEnabled, sellEnabled));
     return this;
   }
 
@@ -59,7 +73,8 @@ public class CompositeStrategy {
 
     double buyScore = 0;
     double sellScore = 0;
-    double totalWeight = 0;
+    List<String> buySignals = new ArrayList<>();
+    List<String> sellSignals = new ArrayList<>();
 
     for (WeightedSignal weighted : signals) {
       weighted.signal().applyContext(ctx);
@@ -67,11 +82,12 @@ public class CompositeStrategy {
       if (result == null) {
         continue;
       }
-      totalWeight += weighted.weight();
-      if (result.side() == SignalSide.BUY) {
-        buyScore += weighted.weight() * result.confidence();
-      } else if (result.side() == SignalSide.SELL) {
-        sellScore += weighted.weight() * result.confidence();
+      if (result.side() == SignalSide.BUY && weighted.buyEnabled()) {
+        buyScore += weighted.buyWeight() * result.confidence();
+        buySignals.add(voteLabel(weighted.signal(), result));
+      } else if (result.side() == SignalSide.SELL && weighted.sellEnabled()) {
+        sellScore += weighted.sellWeight() * result.confidence();
+        sellSignals.add(voteLabel(weighted.signal(), result));
       }
       if (result.note() != null && !result.note().isBlank()) {
         notes.add("[" + weighted.signal().name() + "] " + result.note());
@@ -83,12 +99,20 @@ public class CompositeStrategy {
         reference <= 0 ? 0 : Math.min(1.0, Math.max(buyScore, sellScore) / reference);
 
     if (buyScore >= buyThreshold) {
-      return SignalResult.buy(confidence, joinNotes(notes, "BUY"));
+      return SignalResult.buy(confidence, joinNotes(notes, "BUY"), buySignals);
     }
     if (sellScore >= sellThreshold) {
-      return SignalResult.sell(confidence, joinNotes(notes, "SELL"));
+      return SignalResult.sell(confidence, joinNotes(notes, "SELL"), sellSignals);
     }
     return SignalResult.flat(joinNotes(notes, "FLAT"));
+  }
+
+  private String voteLabel(Signal signal, SignalResult result) {
+    String base = signal.name();
+    if (result.note() == null || result.note().isBlank()) {
+      return base;
+    }
+    return base + " - " + result.note();
   }
 
   private String joinNotes(List<String> notes, String defaultNote) {
@@ -112,5 +136,6 @@ public class CompositeStrategy {
     return Collections.unmodifiableList(filters);
   }
 
-  private record WeightedSignal(Signal signal, double weight) {}
+  private record WeightedSignal(
+      Signal signal, double buyWeight, double sellWeight, boolean buyEnabled, boolean sellEnabled) {}
 }
