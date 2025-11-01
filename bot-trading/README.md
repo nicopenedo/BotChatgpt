@@ -80,6 +80,17 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | POST | `/admin/kill-switch` | `ADMIN` | Activa kill switch. |
 | POST | `/admin/resume` | `ADMIN` | Desactiva kill switch. |
 | GET | `/admin/live-enabled` | `ADMIN` | Consulta estado `liveEnabled`. |
+| GET | `/api/strategy/decide?symbol=BTCUSDT` | `READ` | Evalúa la estrategia compuesta y devuelve `side`, `confidence` y notas. |
+
+## Señales & Estrategia
+- Las señales técnicas viven en `src/main/java/com/bottrading/strategy/signals/` e incluyen SMA/EMA crossover, MACD, RSI con filtro de tendencia, Bollinger Bands, Supertrend, Donchian, Stochastic, VWAP, filtros ATR/ADX/volumen 24h y más.
+- `CompositeStrategy` permite ponderar cada señal mediante `weight` y aplicar filtros. Si un filtro devuelve `FLAT` la operación se aborta.
+- La configuración se controla desde [`src/main/resources/strategy.yml`](src/main/resources/strategy.yml). Se pueden activar/desactivar señales, ajustar parámetros (periodos, umbrales, multiplicadores) y definir los umbrales globales `buy`/`sell`.
+- `StrategyFactory` carga el YAML (o usa defaults sensatos) y expone una `CompositeStrategy` lista para usarse. El servicio `StrategyService` convierte los klines en series numéricas, aplica filtros (por ejemplo 24h volume) y devuelve `SignalResult`.
+- El scheduler `StrategyExecutionScheduler` consulta `StrategyService`, respeta `RiskGuard`, `TradingState`, normaliza ordenes (`tickSize`, `stepSize`, `minNotional`) y ejecuta órdenes vía `OrderService`/`BinanceClient`. El `note` de cada señal queda en los logs para trazabilidad.
+- Endpoint REST: `/api/strategy/decide` devuelve la última evaluación. Ideal para dashboards o monitoreo manual.
+- Warm-up: cada señal valida si existen velas suficientes antes de emitir voto. El número de velas (p.ej. 200 para 1m) se controla en `StrategyService`. Si falta histórico, la estrategia retorna `FLAT`.
+- Tests unitarios cubren cruces SMA/EMA, MACD, RSI, Bollinger, Supertrend, composición y el motor de backtest/GA.
 
 ### Seguridad
 - Autenticación básica (HTTP Basic) con usuarios definidos en `application.properties` (solo para demo). Mover a un almacén seguro o federación de identidad en producción.
@@ -94,12 +105,16 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 - Contadores: `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
 - Gauges: `risk.drawdown`, `risk.equity`.
 
-## Backtesting
-Servicio `BacktestService` simula la estrategia `ScalpingSmaStrategy` sobre klines históricos (formato JSON). Ejecutar mediante:
-```
-java -jar target/bot-trading-1.0.0.jar --backtest.file=src/test/resources/klines/BTCUSDT-1d.json
-```
-Parámetros configurables: `backtest.slippage-bps`, `backtest.start-balance`.
+## Research: Backtesting & GA
+- Nuevo módulo en `com.bottrading.research` con:
+  - `DataLoader` (cache CSV), `ExecutionSimulator`, `Portfolio`, métricas (CAGR, Sharpe, Sortino, Calmar, Profit Factor, win rate, expectancy, exposición, max DD).
+  - `ReportWriter`: genera `metrics.json`, `trades.csv`, `equity.csv`, `drawdown.csv` y script Python para graficar.
+  - Motor GA (`Genome`, `Evaluator`, `GaRunner`, `WalkForwardOptimizer`) que optimiza pesos/params de las señales.
+- CLI:
+  - Backtest: `java -jar target/bot-trading-1.0.0.jar backtest --symbol BTCUSDT --interval 1m --from 2024-01-01T00:00:00Z --to 2024-01-02T00:00:00Z --strategy ./strategy.yml --slippageBps 2 --fees 5`
+  - GA: `java -jar target/bot-trading-1.0.0.jar ga --symbol BTCUSDT --interval 1m --from 2024-01-01T00:00:00Z --to 2024-02-01T00:00:00Z --pop 30 --gens 20 --seed 42`
+- Resultados se escriben en `research-output/` y `ga-output/` por defecto (configurable con `--out`).
+- Tests unitarios (`BacktestEngineTest`, `GaRunnerTest`) validan el pipeline determinista.
 
 ## Pruebas
 ```
@@ -108,6 +123,9 @@ mvn test
 Incluye:
 - Unitarias para utilidades de normalización y validación de órdenes.
 - Integración con WireMock simulando respuestas Binance.
+- Nota: la ejecución requiere acceso a Maven Central; si se observa un `403 Forbidden` al resolver
+  dependencias, configure un mirror corporativo o repositorio alterno antes de volver a ejecutar
+  los tests.
 
 ## Despliegue
 ### Docker

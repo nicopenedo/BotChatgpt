@@ -1,0 +1,79 @@
+# Composite strategy configuration
+# - thresholds control the weighted sum needed to emit BUY/SELL actions
+# - filters must all pass (return non-FLAT) for a trade to be considered
+# - signals vote with the provided weight * confidence
+thresholds:
+  buy: 2.0   # aggregate score required to trigger BUY
+  sell: 2.0  # aggregate score required to trigger SELL
+
+filters:
+  - type: VOLUME24H_FILTER
+    params:
+      minVolume: 25000000
+    # when 24h quote volume falls below the threshold, trading is blocked
+  - type: ATR_FILTER
+    params:
+      period: 14
+      minAtr: 5
+  - type: ADX_FILTER
+    params:
+      period: 14
+      minAdx: 20
+
+signals:
+  - type: SMA_CROSS
+    weight: 1.0
+    confidence: 0.8
+    params:
+      fast: 9
+      slow: 21
+  - type: EMA_CROSS
+    weight: 0.9
+    confidence: 0.7
+    params:
+      fast: 12
+      slow: 26
+  - type: MACD
+    weight: 0.8
+    confidence: 0.7
+    params:
+      fast: 12
+      slow: 26
+      signal: 9
+  - type: RSI
+    weight: 0.6
+    confidence: 0.6
+    params:
+      period: 14
+      lower: 30
+      upper: 70
+      trendSma: 50
+  - type: BOLLINGER
+    weight: 0.5
+    confidence: 0.5
+    params:
+      period: 20
+      stdDevs: 2.0
+  - type: SUPERTREND
+    weight: 0.7
+    confidence: 0.65
+    params:
+      atrPeriod: 10
+      multiplier: 3
+  - type: STOCHASTIC
+    weight: 0.5
+    confidence: 0.55
+    params:
+      k: 14
+      d: 3
+  - type: DONCHIAN
+    weight: 0.6
+    confidence: 0.6
+    params:
+      period: 20
+  - type: VWAP
+    weight: 0.7
+    confidence: 0.6
+    params:
+      confirmation: true
+      confirmationBars: 3
