@@ -4,6 +4,8 @@ import com.bottrading.research.backtest.BacktestEngine;
 import com.bottrading.research.backtest.BacktestRequest;
 import com.bottrading.research.backtest.BacktestResult;
 import com.bottrading.research.backtest.EquityPoint;
+import com.bottrading.research.backtest.ExecutionResult;
+import com.bottrading.research.backtest.ExecutionStatistics;
 import com.bottrading.research.backtest.MetricsSummary;
 import com.bottrading.research.backtest.TradeRecord;
 import com.bottrading.strategy.SignalSide;
@@ -27,7 +29,20 @@ class GaRunnerTest {
             int signals = override.getSignals().size();
             BigDecimal score = BigDecimal.valueOf(signals + 1);
             MetricsSummary metrics =
-                new MetricsSummary(score, score, score, score, BigDecimal.ONE, score, BigDecimal.ONE, score, 1, BigDecimal.ONE);
+                new MetricsSummary(
+                    score,
+                    score,
+                    score,
+                    score,
+                    BigDecimal.ONE,
+                    score,
+                    BigDecimal.ONE,
+                    score,
+                    score,
+                    1,
+                    BigDecimal.ONE,
+                    score,
+                    score);
             return new BacktestResult(
                 request,
                 metrics,
@@ -44,10 +59,18 @@ class GaRunnerTest {
                         "entry",
                         "exit",
                         Collections.emptyList(),
-                        Collections.emptyList())),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        ExecutionResult.ExecutionType.MARKET,
+                        ExecutionResult.ExecutionType.MARKET)),
                 Collections.singletonList(new EquityPoint(Instant.now(), score)),
                 Collections.emptyList(),
-                "hash");
+                "hash",
+                new ExecutionStatistics());
           }
         };
 
@@ -66,6 +89,7 @@ class GaRunnerTest {
             null,
             "test",
             false,
+            null,
             null);
     Evaluator evaluator = new Evaluator(engine, request, 1, Path.of("ga-test"), 0.0, 0);
     GaRunner runner = new GaRunner(evaluator, 4, 2, 0.1, 2, 1, 42L);

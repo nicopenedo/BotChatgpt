@@ -3,6 +3,7 @@ package com.bottrading.research.ga;
 import com.bottrading.research.backtest.BacktestEngine;
 import com.bottrading.research.backtest.BacktestRequest;
 import com.bottrading.research.backtest.BacktestResult;
+import com.bottrading.research.backtest.ExecutionStatistics;
 import com.bottrading.research.backtest.MetricsSummary;
 import com.bottrading.research.regime.RegimeFilter;
 import com.bottrading.research.regime.RegimeLabel;
@@ -50,9 +51,13 @@ class EvaluatorTest {
                     value,
                     value,
                     value,
+                    value,
                     (int) allowed,
+                    value,
+                    value,
                     value);
-            return new BacktestResult(request, metrics, List.of(), List.of(), List.of(), "hash");
+            return new BacktestResult(
+                request, metrics, List.of(), List.of(), List.of(), "hash", new ExecutionStatistics());
           }
         };
 
@@ -71,6 +76,7 @@ class EvaluatorTest {
             null,
             "run",
             false,
+            null,
             null);
 
     Genome baseGenome = new Genome(new Random(1));
@@ -94,7 +100,8 @@ class EvaluatorTest {
             null,
             "run",
             false,
-            upFilter);
+            upFilter,
+            null);
     Genome upGenome = new Genome(new Random(2));
     Evaluator evaluatorUp = new Evaluator(engine, requestUp, 1, Path.of("reports"), 0.0, 0);
     evaluatorUp.evaluate(List.of(upGenome));

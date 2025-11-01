@@ -17,10 +17,20 @@ public record TradeRecord(
     String entryReason,
     String exitReason,
     List<String> entrySignals,
-    List<String> exitSignals) {
+    List<String> exitSignals,
+    List<FillDetail> entryFills,
+    List<FillDetail> exitFills,
+    BigDecimal totalFees,
+    BigDecimal slippageBps,
+    BigDecimal averageQueueTimeMs,
+    BigDecimal riskMultiple,
+    ExecutionResult.ExecutionType entryExecutionType,
+    ExecutionResult.ExecutionType exitExecutionType) {
 
   public TradeRecord {
     entrySignals = entrySignals == null ? List.of() : List.copyOf(entrySignals);
     exitSignals = exitSignals == null ? List.of() : List.copyOf(exitSignals);
+    entryFills = entryFills == null ? List.of() : List.copyOf(entryFills);
+    exitFills = exitFills == null ? List.of() : List.copyOf(exitFills);
   }
 }

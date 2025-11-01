@@ -58,7 +58,8 @@ public class WalkForwardOptimizer {
               base.seed(),
               base.runId(),
               base.useCache(),
-              base.regimeFilter()));
+              base.regimeFilter(),
+              base.realisticConfig()));
     }
     return segments;
   }
@@ -112,7 +113,8 @@ public class WalkForwardOptimizer {
               request.seed(),
               request.runId() + "-wf" + index++,
               request.useCache(),
-              regimeFilter));
+              regimeFilter,
+              request.realisticConfig()));
     }
     return segments;
   }

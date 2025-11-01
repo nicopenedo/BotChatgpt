@@ -54,7 +54,15 @@ public class ReportWriter {
           "exitPrice",
           "exitMotivo",
           "entrySignals",
-          "exitSignals"
+          "exitSignals",
+          "entryFills",
+          "exitFills",
+          "totalFees",
+          "slippageBps",
+          "avgQueueMs",
+          "riskMultiple",
+          "entryExec",
+          "exitExec"
         });
     for (TradeRecord trade : trades) {
       rows.add(
@@ -69,7 +77,15 @@ public class ReportWriter {
             trade.exitPrice().toPlainString(),
             trade.exitReason(),
             String.join("|", trade.entrySignals()),
-            String.join("|", trade.exitSignals())
+            String.join("|", trade.exitSignals()),
+            formatFills(trade.entryFills()),
+            formatFills(trade.exitFills()),
+            trade.totalFees().toPlainString(),
+            trade.slippageBps().toPlainString(),
+            trade.averageQueueTimeMs().toPlainString(),
+            trade.riskMultiple().toPlainString(),
+            trade.entryExecutionType().name(),
+            trade.exitExecutionType().name()
           });
     }
     csvWriter.write(path, rows);
@@ -104,22 +120,50 @@ public class ReportWriter {
     metrics.put("profitFactor", asString(result.metrics().profitFactor()));
     metrics.put("winRate", asString(result.metrics().winRate()));
     metrics.put("expectancy", asString(result.metrics().expectancy()));
+    metrics.put("averageR", asString(result.metrics().averageR()));
     metrics.put("trades", result.metrics().trades());
     metrics.put("exposure", asString(result.metrics().exposure()));
+    metrics.put("fillRate", asString(result.metrics().fillRate()));
+    metrics.put("ttlExpiredRate", asString(result.metrics().ttlExpiredRate()));
     summary.put("metrics", metrics);
 
-    summary.put("trades", tradesSummary(result.trades()));
+    summary.put("trades", tradesSummary(result.trades(), result.executionStatistics()));
 
     return summary;
   }
 
-  private Map<String, Object> tradesSummary(List<TradeRecord> trades) {
+  private Map<String, Object> tradesSummary(List<TradeRecord> trades, ExecutionStatistics stats) {
     Map<String, Object> map = new LinkedHashMap<>();
     map.put("total", trades.size());
     long wins = trades.stream().filter(TradeRecord::win).count();
     map.put("wins", wins);
     map.put("losses", trades.size() - wins);
+    if (stats != null) {
+      map.put("requestedQty", asString(stats.requestedQty()));
+      map.put("filledQty", asString(stats.filledQty()));
+      map.put("fillRate", asString(stats.fillRate()));
+      map.put("ttlExpired", stats.ttlExpiredOrders());
+    }
     return map;
+  }
+
+  private String formatFills(List<FillDetail> fills) {
+    if (fills == null || fills.isEmpty()) {
+      return "";
+    }
+    List<String> encoded = new ArrayList<>();
+    for (FillDetail fill : fills) {
+      long epoch = fill.time() != null ? fill.time().toEpochMilli() : 0L;
+      encoded.add(
+          epoch
+              + "@"
+              + fill.price().toPlainString()
+              + "#"
+              + fill.quantity().toPlainString()
+              + "#"
+              + fill.queueTimeMs());
+    }
+    return String.join("|", encoded);
   }
 
   private String asString(Object value) {

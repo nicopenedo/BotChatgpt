@@ -4,6 +4,7 @@ import com.bottrading.model.dto.Kline;
 import com.bottrading.research.ga.GenomeStrategyBuilder;
 import com.bottrading.research.ga.io.GenomeIO;
 import com.bottrading.research.ga.io.GenomeFile;
+import com.bottrading.research.backtest.realistic.RealisticExecutionSimulator;
 import com.bottrading.strategy.CompositeStrategy;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
@@ -53,14 +54,27 @@ public class BacktestEngine {
     }
     CompositeStrategy strategy = resolveStrategy(request, override);
 
-    ExecutionSimulator simulator =
-        new ExecutionSimulator(
+    SimpleExecutionSimulator simulator =
+        new SimpleExecutionSimulator(
             request.slippageBps() == null ? BigDecimal.ZERO : request.slippageBps(),
             request.takerFeeBps() == null ? BigDecimal.ZERO : request.takerFeeBps(),
             request.makerFeeBps() == null ? BigDecimal.ZERO : request.makerFeeBps());
+    RealisticExecutionSimulator realisticSimulator = null;
+    if (request.realisticConfig() != null) {
+      long seed = request.seed() != null ? request.seed() : System.currentTimeMillis();
+      realisticSimulator =
+          new RealisticExecutionSimulator(
+              request.symbol(),
+              request.realisticConfig(),
+              request.makerFeeBps(),
+              request.takerFeeBps(),
+              seed);
+    }
     Portfolio portfolio = new Portfolio(startingCapital);
+    ExecutionStatistics executionStats = new ExecutionStatistics();
     List<String[]> buffer = new ArrayList<>();
-    for (Kline kline : klines) {
+    for (int index = 0; index < klines.size(); index++) {
+      Kline kline = klines.get(index);
       buffer.add(toArray(kline));
       BigDecimal volume24h = trailingVolume(buffer, 1440);
       StrategyContext context =
@@ -78,31 +92,53 @@ public class BacktestEngine {
         BigDecimal allocation = portfolio.equity().multiply(riskFraction);
         BigDecimal quantity = allocation.divide(price, 8, RoundingMode.DOWN);
         if (quantity.compareTo(BigDecimal.ZERO) > 0) {
-          ExecutionResult fill = simulator.simulateBuy(price, quantity, false);
-          portfolio.buy(kline.openTime(), fill.price(), fill.quantity(), fill.fee(), metadata);
+          ExecutionResult fill;
+          if (realisticSimulator != null) {
+            fill = realisticSimulator.executeEntry(SignalSide.BUY, klines, index, quantity);
+          } else {
+            fill = simulator.simulateBuy(price, quantity, false);
+          }
+          executionStats.recordLimitAttempt(quantity, fill);
+          portfolio.buy(fill, metadata);
         }
       } else if (decision.side() == SignalSide.SELL && portfolio.hasPosition()) {
-        ExecutionResult fill = simulator.simulateSell(price, portfolio.positionSize(), false);
-        portfolio.sell(kline.openTime(), fill.price(), fill.quantity(), fill.fee(), metadata);
+        ExecutionResult fill;
+        if (realisticSimulator != null) {
+          fill = realisticSimulator.executeExit(SignalSide.SELL, klines, index, portfolio.positionSize());
+        } else {
+          fill = simulator.simulateSell(price, portfolio.positionSize(), false);
+        }
+        portfolio.sell(fill, metadata);
       }
       portfolio.mark(kline.openTime(), price);
     }
     if (portfolio.hasPosition()) {
       Kline last = klines.get(klines.size() - 1);
-      ExecutionResult fill = simulator.simulateSell(last.close(), portfolio.positionSize(), false);
+      ExecutionResult fill;
+      if (realisticSimulator != null) {
+        fill =
+            realisticSimulator.executeExit(
+                SignalSide.SELL, klines, klines.size() - 1, portfolio.positionSize());
+      } else {
+        fill = simulator.simulateSell(last.close(), portfolio.positionSize(), false);
+      }
       portfolio.sell(
-          last.openTime(),
-          fill.price(),
-          fill.quantity(),
-          fill.fee(),
+          fill,
           new Portfolio.TradeMetadata(
               SignalSide.SELL, "Force exit - end of data", List.of("FORCED_EXIT")));
     }
-    MetricsSummary metrics = MetricsCalculator.compute(portfolio.trades(), portfolio.equityCurve());
+    MetricsSummary metrics =
+        MetricsCalculator.compute(portfolio.trades(), portfolio.equityCurve(), executionStats);
     String dataHash = computeDataHash(request, klines);
     BacktestResult result =
         new BacktestResult(
-            request, metrics, portfolio.trades(), portfolio.equityCurve(), klines, dataHash);
+            request,
+            metrics,
+            portfolio.trades(),
+            portfolio.equityCurve(),
+            klines,
+            dataHash,
+            executionStats);
     if (reportDirectory != null) {
       reportWriter.write(reportDirectory, result);
     }

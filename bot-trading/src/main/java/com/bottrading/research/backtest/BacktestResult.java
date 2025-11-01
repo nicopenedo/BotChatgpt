@@ -9,4 +9,5 @@ public record BacktestResult(
     List<TradeRecord> trades,
     List<EquityPoint> equityCurve,
     List<Kline> klines,
-    String dataHash) {}
+    String dataHash,
+    ExecutionStatistics executionStatistics) {}
