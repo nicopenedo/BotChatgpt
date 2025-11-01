@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "shadow_positions")
@@ -53,6 +54,18 @@ public class ShadowPositionEntity {
   private BigDecimal realizedPnl;
 
   private int trades;
+
+  @Column(name = "regime_trend")
+  private String regimeTrend;
+
+  @Column(name = "regime_volatility")
+  private String regimeVolatility;
+
+  @Column(name = "preset_key")
+  private String presetKey;
+
+  @Column(name = "preset_id")
+  private UUID presetId;
 
   public Long getId() {
     return id;
@@ -156,5 +169,37 @@ public class ShadowPositionEntity {
 
   public void setTrades(int trades) {
     this.trades = trades;
+  }
+
+  public String getRegimeTrend() {
+    return regimeTrend;
+  }
+
+  public void setRegimeTrend(String regimeTrend) {
+    this.regimeTrend = regimeTrend;
+  }
+
+  public String getRegimeVolatility() {
+    return regimeVolatility;
+  }
+
+  public void setRegimeVolatility(String regimeVolatility) {
+    this.regimeVolatility = regimeVolatility;
+  }
+
+  public String getPresetKey() {
+    return presetKey;
+  }
+
+  public void setPresetKey(String presetKey) {
+    this.presetKey = presetKey;
+  }
+
+  public UUID getPresetId() {
+    return presetId;
+  }
+
+  public void setPresetId(UUID presetId) {
+    this.presetId = presetId;
   }
 }

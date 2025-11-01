@@ -70,7 +70,16 @@ class ShadowEngineTests {
   void shouldCloseShadowOnTakeProfit() {
     ShadowEngine engine = newEngine();
     StopPlan plan = new StopPlan(BigDecimal.valueOf(99), BigDecimal.valueOf(101), BigDecimal.valueOf(0.5), null, StopProperties.StopSymbolProperties.from(new StopProperties()));
-    engine.registerShadow("BTCUSDT", OrderSide.BUY, BigDecimal.valueOf(100), BigDecimal.ONE, plan);
+    engine.registerShadow(
+        "BTCUSDT",
+        OrderSide.BUY,
+        BigDecimal.valueOf(100),
+        BigDecimal.ONE,
+        plan,
+        null,
+        null,
+        null,
+        null);
 
     engine.onPriceUpdate("BTCUSDT", BigDecimal.valueOf(101.5));
 

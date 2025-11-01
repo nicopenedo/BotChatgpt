@@ -19,6 +19,9 @@ public final class RiskState {
   private final BigDecimal currentEquity;
   private final Set<RiskFlag> flags;
   private final Instant lastReset;
+  private final BigDecimal varExposure;
+  private final BigDecimal varLimit;
+  private final BigDecimal varRatio;
 
   public RiskState(
       RiskMode mode,
@@ -31,7 +34,10 @@ public final class RiskState {
       int openingsToday,
       BigDecimal currentEquity,
       Set<RiskFlag> flags,
-      Instant lastReset) {
+      Instant lastReset,
+      BigDecimal varExposure,
+      BigDecimal varLimit,
+      BigDecimal varRatio) {
     this.mode = mode;
     this.dailyPnl = dailyPnl;
     this.dailyLossPct = dailyLossPct;
@@ -45,6 +51,9 @@ public final class RiskState {
         Collections.unmodifiableSet(
             flags.isEmpty() ? EnumSet.noneOf(RiskFlag.class) : EnumSet.copyOf(flags));
     this.lastReset = lastReset;
+    this.varExposure = varExposure;
+    this.varLimit = varLimit;
+    this.varRatio = varRatio;
   }
 
   public RiskMode mode() {
@@ -89,5 +98,17 @@ public final class RiskState {
 
   public Instant lastReset() {
     return lastReset;
+  }
+
+  public BigDecimal varExposure() {
+    return varExposure;
+  }
+
+  public BigDecimal varLimit() {
+    return varLimit;
+  }
+
+  public BigDecimal varRatio() {
+    return varRatio;
   }
 }

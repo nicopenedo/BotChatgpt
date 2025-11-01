@@ -42,7 +42,9 @@
       healthBadge: document.getElementById('healthBadge'),
       healthNote: document.getElementById('healthNote'),
       modeBadge: document.getElementById('modeBadge'),
-      modeNote: document.getElementById('modeNote')
+      modeNote: document.getElementById('modeNote'),
+      varBadge: document.getElementById('varBadge'),
+      varNote: document.getElementById('varNote')
     },
     tca: {
       samples: document.getElementById('tcaSamples'),
@@ -56,8 +58,24 @@
       canaryShare: document.getElementById('banditCanaryShare'),
       armsBody: document.querySelector('#banditArmsTable tbody'),
       pullsBody: document.querySelector('#banditPullsTable tbody')
-    }
+    },
+    varSnapshotsBody: document.querySelector('#varSnapshots tbody'),
+    varSnapshotMeta: document.getElementById('varSnapshotMeta')
   };
+
+  const currencyFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+    notation: 'compact'
+  });
+
+  function formatCurrency(value) {
+    if (!Number.isFinite(value)) {
+      return '--';
+    }
+    return currencyFormatter.format(value);
+  }
 
   function initFromDefaults() {
     const body = document.body;
@@ -239,6 +257,7 @@
         params: { symbol: params.symbol, from: params.from || undefined, to: params.to || undefined }
       })
     );
+    requests.push(axios.get('/api/var/snapshots', { params: { symbol: params.symbol } }));
     return Promise.all(requests);
   }
 
@@ -257,7 +276,8 @@
       supertrendRes,
       regimeStatusRes,
       overviewRes,
-      tcaRes
+      tcaRes,
+      varSnapshotsRes
     ] = responses;
     const klines = klinesRes.data || [];
     const candles = toCandle(klines);
@@ -279,6 +299,7 @@
     renderTrades(tradesRes.data.content || []);
     renderSummary(summaryRes.data || []);
     renderHeatmap(heatmapRes.data);
+    renderVarSnapshots(varSnapshotsRes?.data || []);
 
     const markerData = buildMarkers(annotations);
     if (priceChart) priceChart.destroy();
@@ -801,6 +822,23 @@
     }
     setPill(status.modeBadge, label, state);
     status.modeNote.textContent = `Mode ${mode} · Kill-switch ${killSwitch ? 'ON' : 'OFF'}`;
+
+    const varData = overview.var || {};
+    if (status.varBadge) {
+      const ratio = Number(varData.ratio);
+      let varState = 'ok';
+      if (ratio >= 1) {
+        varState = 'error';
+      } else if (ratio >= 0.7) {
+        varState = 'warn';
+      }
+      const cvarValue = Number(varData.cvar);
+      setPill(status.varBadge, cvarValue ? `-${formatCurrency(cvarValue)}` : '--', varState);
+      const sizeRatio = Number(varData.qtyRatio);
+      const exposurePct = Number.isFinite(ratio) ? `${(ratio * 100).toFixed(1)}% budget` : '--';
+      const sizeText = Number.isFinite(sizeRatio) ? `Size x${sizeRatio.toFixed(2)}` : 'Size --';
+      status.varNote.textContent = `${sizeText} · ${exposurePct}`;
+    }
   }
 
   function renderTcaPanel(stats) {
@@ -845,6 +883,47 @@
         tca.hourlyBody.appendChild(row);
       });
     }
+  }
+
+  function renderVarSnapshots(rows) {
+    const tbody = elements.varSnapshotsBody;
+    const meta = elements.varSnapshotMeta;
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const snapshots = Array.isArray(rows) ? rows.slice(0, 20) : [];
+    if (meta) {
+      meta.textContent = snapshots.length ? `${snapshots.length} shown` : 'No samples';
+    }
+    if (!snapshots.length) {
+      return;
+    }
+    snapshots.forEach((row) => {
+      const tr = document.createElement('tr');
+      const dt = row.timestamp ? DateTime.fromISO(row.timestamp, { zone: 'utc' }) : null;
+      const tsCell = document.createElement('td');
+      tsCell.textContent = dt && dt.isValid ? dt.toFormat('HH:mm:ss') : '--';
+      const cvarCell = document.createElement('td');
+      const cvarValue = Number(row.cvar);
+      cvarCell.textContent = cvarValue ? `-${formatCurrency(cvarValue)}` : '--';
+      const ratioCell = document.createElement('td');
+      const ratio = Number(row.qtyRatio);
+      ratioCell.textContent = Number.isFinite(ratio) ? `x${ratio.toFixed(2)}` : '--';
+      const reasonCell = document.createElement('td');
+      let reasonText = '--';
+      if (row.reasonsJson) {
+        try {
+          const reasons = JSON.parse(row.reasonsJson);
+          if (Array.isArray(reasons) && reasons.length) {
+            reasonText = reasons.map((r) => r.code || r).join(', ');
+          }
+        } catch (err) {
+          reasonText = row.reasonsJson;
+        }
+      }
+      reasonCell.textContent = reasonText;
+      tr.append(tsCell, cvarCell, ratioCell, reasonCell);
+      tbody.appendChild(tr);
+    });
   }
 
   function buildMarkers(annotations) {

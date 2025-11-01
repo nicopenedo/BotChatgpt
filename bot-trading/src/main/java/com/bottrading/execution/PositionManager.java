@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -106,6 +107,10 @@ public class PositionManager {
     entity.setLastUpdateAt(entity.getOpenedAt());
     entity.setStatus(PositionStatus.OPEN);
     entity.setCorrelationId(command.correlationId());
+    entity.setRegimeTrend(command.regimeTrend());
+    entity.setRegimeVolatility(command.regimeVolatility());
+    entity.setPresetKey(command.presetKey());
+    entity.setPresetId(command.presetId());
     PositionEntity saved = positionRepository.save(entity);
     positionLocks.putIfAbsent(saved.getId(), new ReentrantLock());
 
@@ -452,7 +457,11 @@ public class PositionManager {
       BigDecimal stopLoss,
       BigDecimal takeProfit,
       String trailingConfigurationJson,
-      String correlationId) {}
+      String correlationId,
+      String regimeTrend,
+      String regimeVolatility,
+      String presetKey,
+      UUID presetId) {}
 
   public record ExternalOrderSnapshot(
       String symbol,

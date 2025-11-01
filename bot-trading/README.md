@@ -29,6 +29,32 @@ Este proyecto provee un bot de scalping para Binance Spot construido con Spring 
 - **Drift & Health Watchdog**: compara live vs shadow/expected, aplica degradaciones automáticas y pausa si hay problemas de conectividad/API.
 - **TCA Service**: registra slippage en bps, colas y recomienda LIMIT/MARKET según condiciones reales.
 
+## Gestión intradía de VaR/CVaR y sizing dinámico
+
+- **Modelo de retorno**: cada trade se normaliza en R-múltiplos (`pnl_r`) con slippage observado (`slippage_bps`) proveniente de `vw_trades_enriched` y posiciones shadow. La cola se ajusta vía Cornish-Fisher o bootstrap pesado (`var.heavy_tails`).
+- **Sizing con CVaR**: antes de enviar la orden se evalúa `VarAssessment` y se recorta la cantidad hasta que `CVaR_q · stopDistance · qty ≤ cvar_target_pct_per_trade · equity`. Si el presupuesto diario (`cvar_target_pct_per_day`) quedaría excedido se bloquea la entrada.
+- **Persistencia y auditoría**: cada evaluación queda en `risk_var_snapshot` con razones (`TRADE_LIMIT`, `DAILY_LIMIT`, fallback de muestras, etc.) y se expone en `/api/var/snapshots`.
+- **Integración**: `RiskGuard` y `AllocatorService` consultan el ratio de presupuesto usado para bloquear nuevas aperturas si la suma de CVaR de posiciones abiertas alcanza el límite diario.
+- **Micrometer**: gauges `var.cvar_q{symbol,regime,preset}` y `sizing.qty_var_ratio` permiten monitorear el ajuste aplicado; los bloqueos registran `blocks.by_var{reason}`.
+- **UI**: el dashboard añade un badge de CVaR con el ratio de corte aplicado y una tabla de snapshots con timestamp, CVaR proyectado, sizing y motivo.
+
+### Configuración (`application.yml`)
+
+```yaml
+var:
+  enabled: true
+  quantile: 0.99
+  cvar_target_pct_per_trade: 0.25   # % del capital por trade
+  cvar_target_pct_per_day: 1.5      # % del capital por día
+  lookback_trades: 250              # muestras símbolo/preset
+  min_trades_for_symbol_preset: 80  # umbral antes de usar pool por régimen
+  fallback_to_regime_pool: true
+  mc_iterations: 20000              # bootstrap Monte Carlo
+  heavy_tails: true                 # activa Cornish-Fisher/colas gruesas
+```
+
+> **Tip:** ajustar `cvar_target_pct_per_trade`/`per_day` según el capital y la tolerancia diaria. Para backtests con colas extremas, incrementar `lookback_trades` y `mc_iterations` o setear `heavy_tails=false`.
+
 ## Gestión de presets y promoción
 El bot incorpora un pipeline completo de versionado y promoción de presets por régimen (`UP/DOWN/RANGE`) y `side` (`BUY/SELL`). Cada import del GA crea una `PresetVersion` candidata con trazabilidad a la corrida (`BacktestRun`) y hashes de código/datos/labels para reproducibilidad. El `PresetService` aplica la política de promoción configurable (`PF`, `MaxDD`, trades mínimos y chequeo Shadow) antes de activar un preset en modo **canary** o **full**. El `StrategyRouter` consulta siempre la versión `active` para enrutar la estrategia correspondiente, y los cambios se reflejan en caliente.
 

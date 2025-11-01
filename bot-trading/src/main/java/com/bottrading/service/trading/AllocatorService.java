@@ -5,8 +5,10 @@ import com.bottrading.model.entity.PositionEntity;
 import com.bottrading.model.enums.PositionStatus;
 import com.bottrading.repository.PositionRepository;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.risk.IntradayVarService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,6 +33,7 @@ public class AllocatorService {
   private final PositionRepository positionRepository;
   private final BinanceClient binanceClient;
   private final MeterRegistry meterRegistry;
+  private final IntradayVarService intradayVarService;
   private final ConcurrentMap<String, CachedCorrelation> correlationCache = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AllocationStatus> lastStatus = new ConcurrentHashMap<>();
 
@@ -38,11 +41,13 @@ public class AllocatorService {
       TradingProps tradingProps,
       PositionRepository positionRepository,
       BinanceClient binanceClient,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      IntradayVarService intradayVarService) {
     this.tradingProps = tradingProps;
     this.positionRepository = positionRepository;
     this.binanceClient = binanceClient;
     this.meterRegistry = meterRegistry;
+    this.intradayVarService = intradayVarService;
   }
 
   public AllocationDecision evaluate(String symbol) {
@@ -84,6 +89,14 @@ public class AllocatorService {
         && props.getPerSymbolMaxRiskPct().doubleValue() > 0
         && symbolRisk > props.getPerSymbolMaxRiskPct().doubleValue()) {
       return AllocationDecision.blocked("SYMBOL_RISK");
+    }
+
+    if (intradayVarService != null && intradayVarService.isEnabled()) {
+      IntradayVarService.ExposureSnapshot exposure = intradayVarService.exposure(null);
+      if (exposure.limit().compareTo(BigDecimal.ZERO) > 0
+          && exposure.ratio().compareTo(BigDecimal.ONE) >= 0) {
+        return AllocationDecision.blocked("VAR_BUDGET");
+      }
     }
 
     Set<String> otherSymbols =

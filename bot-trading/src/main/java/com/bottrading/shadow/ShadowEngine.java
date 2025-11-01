@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.stereotype.Service;
@@ -59,7 +60,15 @@ public class ShadowEngine {
   }
 
   public ShadowPositionEntity registerShadow(
-      String symbol, OrderSide side, BigDecimal entryPrice, BigDecimal quantity, StopPlan plan) {
+      String symbol,
+      OrderSide side,
+      BigDecimal entryPrice,
+      BigDecimal quantity,
+      StopPlan plan,
+      String regimeTrend,
+      String regimeVolatility,
+      String presetKey,
+      UUID presetId) {
     if (!isEnabled()) {
       return null;
     }
@@ -71,6 +80,10 @@ public class ShadowEngine {
     entity.setStopLoss(plan.stopLoss());
     entity.setTakeProfit(plan.takeProfit());
     entity.setOpenedAt(Instant.now(clock));
+    entity.setRegimeTrend(regimeTrend);
+    entity.setRegimeVolatility(regimeVolatility);
+    entity.setPresetKey(presetKey);
+    entity.setPresetId(presetId);
     return repository.save(entity);
   }
 

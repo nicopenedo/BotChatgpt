@@ -16,6 +16,9 @@ import com.bottrading.execution.ExecutionRequest;
 import com.bottrading.execution.ExecutionRequest.Urgency;
 import com.bottrading.execution.MarketSnapshot;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.risk.IntradayVarService;
+import com.bottrading.service.risk.IntradayVarService.VarAssessment;
+import com.bottrading.service.risk.IntradayVarService.VarInput;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradeEvent;
 import com.bottrading.strategy.SignalResult;
@@ -51,6 +54,7 @@ public class OrderExecutionService {
   private final PositionManager positionManager;
   private final ShadowEngine shadowEngine;
   private final ExecutionEngine executionEngine;
+  private final IntradayVarService intradayVarService;
 
   public OrderExecutionService(
       TradingProps tradingProps,
@@ -62,7 +66,8 @@ public class OrderExecutionService {
       StopEngine stopEngine,
       PositionManager positionManager,
       ShadowEngine shadowEngine,
-      ExecutionEngine executionEngine) {
+      ExecutionEngine executionEngine,
+      IntradayVarService intradayVarService) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
     this.orderService = orderService;
@@ -73,6 +78,7 @@ public class OrderExecutionService {
     this.positionManager = positionManager;
     this.shadowEngine = shadowEngine;
     this.executionEngine = executionEngine;
+    this.intradayVarService = intradayVarService;
   }
 
   public Optional<ExecutionResult> execute(
@@ -120,13 +126,36 @@ public class OrderExecutionService {
       log.warn("Sizing failed for {}: {}", decisionKey, ex.getMessage());
       return Optional.empty();
     }
+
+    VarAssessment varAssessment =
+        intradayVarService.assess(
+            new VarInput(
+                symbol,
+                decision.preset(),
+                decision.banditSelection() != null ? decision.banditSelection().presetId() : null,
+                decision.regime() != null ? decision.regime().trend().name() : null,
+                decision.regime() != null ? decision.regime().volatility().name() : null,
+                orderSide,
+                lastPrice,
+                stopPlan.stopLoss(),
+                sizingResult.quantity(),
+                equity,
+                exchangeInfo.stepSize()));
+    if (varAssessment.blocked()) {
+      log.info("VAR guard blocked {} reasons={}", decisionKey, varAssessment.reasons());
+      return Optional.empty();
+    }
     OrderRequest request = new OrderRequest();
     request.setSymbol(symbol);
     request.setSide(orderSide);
     request.setDryRun(tradingProps.isDryRun());
     request.setClientOrderId(newClientOrderId(symbol, interval, closeTime));
 
-    BigDecimal quantity = sizingResult.quantity();
+    BigDecimal quantity = varAssessment.adjustedQuantity();
+    if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+      log.info("VAR adjusted quantity to zero for {}", decisionKey);
+      return Optional.empty();
+    }
     if (orderSide == OrderSide.BUY) {
       BigDecimal requiredQuote = quantity.multiply(lastPrice);
       if (requiredQuote.compareTo(quoteBalance) > 0) {
@@ -143,13 +172,14 @@ public class OrderExecutionService {
       meterRegistry.counter("orders.queued", SELL_TAG).increment();
     }
 
+    BigDecimal notional = quantity.multiply(lastPrice);
     ExecutionRequest request =
         new ExecutionRequest(
             symbol,
             orderSide,
             quantity,
             lastPrice,
-            quantity.multiply(lastPrice),
+            notional,
             exchangeInfo,
             resolveUrgency(decision.signal().confidence()),
             estimateMaxSlippageBps(lastPrice, atr),
@@ -196,8 +226,21 @@ public class OrderExecutionService {
                 stopPlan.stopLoss(),
                 stopPlan.takeProfit(),
                 null,
-                lastClientOrderId));
-        shadowEngine.registerShadow(symbol, orderSide, result.averagePrice(), result.executedQty(), stopPlan);
+                lastClientOrderId,
+                decision.regime() != null ? decision.regime().trend().name() : null,
+                decision.regime() != null ? decision.regime().volatility().name() : null,
+                decision.preset(),
+                decision.banditSelection() != null ? decision.banditSelection().presetId() : null));
+        shadowEngine.registerShadow(
+            symbol,
+            orderSide,
+            result.averagePrice(),
+            result.executedQty(),
+            stopPlan,
+            decision.regime() != null ? decision.regime().trend().name() : null,
+            decision.regime() != null ? decision.regime().volatility().name() : null,
+            decision.preset(),
+            decision.banditSelection() != null ? decision.banditSelection().presetId() : null);
       }
       return Optional.of(result);
     } catch (Exception ex) {

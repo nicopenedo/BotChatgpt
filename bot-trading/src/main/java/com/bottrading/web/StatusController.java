@@ -3,6 +3,8 @@ package com.bottrading.web;
 import com.bottrading.config.TradingProps;
 import com.bottrading.service.health.HealthService;
 import com.bottrading.service.health.HealthService.HealthStatus;
+import com.bottrading.service.risk.IntradayVarService;
+import com.bottrading.service.risk.IntradayVarService.VarStatus;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.RiskState;
 import com.bottrading.service.risk.drift.DriftWatchdog;
@@ -27,18 +29,21 @@ public class StatusController {
   private final AllocatorService allocatorService;
   private final DriftWatchdog driftWatchdog;
   private final HealthService healthService;
+  private final IntradayVarService intradayVarService;
 
   public StatusController(
       TradingProps tradingProps,
       RiskGuard riskGuard,
       AllocatorService allocatorService,
       DriftWatchdog driftWatchdog,
-      HealthService healthService) {
+      HealthService healthService,
+      IntradayVarService intradayVarService) {
     this.tradingProps = tradingProps;
     this.riskGuard = riskGuard;
     this.allocatorService = allocatorService;
     this.driftWatchdog = driftWatchdog;
     this.healthService = healthService;
+    this.intradayVarService = intradayVarService;
   }
 
   @GetMapping("/overview")
@@ -55,13 +60,23 @@ public class StatusController {
     trading.put("killSwitch", riskState.mode().isPaused());
     trading.put("liveEnabled", tradingProps.isLiveEnabled() && riskState.mode().isLive());
     trading.put("riskFlags", riskState.flags());
+    VarStatus varStatus = intradayVarService.status(effective);
+    Map<String, Object> var = new HashMap<>();
+    var.put("cvar", varStatus.cvar());
+    var.put("var", varStatus.var());
+    var.put("qtyRatio", varStatus.qtyRatio());
+    var.put("timestamp", varStatus.timestamp());
+    var.put("exposure", riskState.varExposure());
+    var.put("limit", riskState.varLimit());
+    var.put("ratio", riskState.varRatio());
     return ResponseEntity.ok(
         Map.of(
             "symbol", effective,
             "allocator", allocation,
             "drift", driftStatus,
             "health", healthStatus,
-            "trading", trading));
+            "trading", trading,
+            "var", var));
   }
 }
 
