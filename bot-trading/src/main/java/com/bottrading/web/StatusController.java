@@ -60,6 +60,7 @@ public class StatusController {
     trading.put("killSwitch", riskState.mode().isPaused());
     trading.put("liveEnabled", tradingProps.isLiveEnabled() && riskState.mode().isLive());
     trading.put("riskFlags", riskState.flags());
+    trading.put("marketDataStale", riskState.marketDataStale());
     VarStatus varStatus = intradayVarService.status(effective);
     Map<String, Object> var = new HashMap<>();
     var.put("cvar", varStatus.cvar());

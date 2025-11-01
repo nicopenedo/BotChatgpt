@@ -3,7 +3,6 @@
 /.project
 /.classpath
 /.settings/
-/.mvn/
 *.iml
 .env
 *.log

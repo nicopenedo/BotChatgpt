@@ -54,3 +54,12 @@ var:
   fallback_to_regime_pool: true
   mc_iterations: 20000
   heavy_tails: true
+chaos:
+  enabled: false
+  ws-drop-rate-pct: 0
+  api-burst429-seconds: 0
+  latency-multiplier: 1.0
+  candles-gap-pattern: NONE
+  clock-drift-ms: 0
+  safety:
+    max-duration-sec: 600

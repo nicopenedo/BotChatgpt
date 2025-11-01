@@ -29,6 +29,71 @@ Este proyecto provee un bot de scalping para Binance Spot construido con Spring 
 - **Drift & Health Watchdog**: compara live vs shadow/expected, aplica degradaciones automáticas y pausa si hay problemas de conectividad/API.
 - **TCA Service**: registra slippage en bps, colas y recomienda LIMIT/MARKET según condiciones reales.
 
+### Dependencias Maven
+
+El repositorio incluye un `.mvn/settings.xml` para forzar el mirror `repo1.maven.org`. Si tu entorno corporativo bloquea Maven
+Central con respuesta `403`, actualizá esa URL por un mirror accesible o precargá el artefacto `spring-boot-starter-parent` en tu
+cache local (`~/.m2/repository`).
+
+## Chaos & Resilience Pack
+
+El bot incorpora un módulo de caos activable en runtime para validar resiliencia sin tocar producción real.
+
+- **ChaosSuite**: inyecta fallas controladas sobre el WebSocket, API REST y reloj local.
+- **Fail-safe**: timeout automático (`chaos.safety.max-duration-sec`) y kill-switch remoto.
+- **CandleSanitizer**: valida klines, rellena huecos y elimina duplicados antes de pasar al motor.
+- **ChaosClock**: aplica `clock.driftMs` sobre el `Clock` global para validar watchdogs dependientes del tiempo.
+- **RiskGuard awareness**: añade estado `marketDataStale` para bloquear nuevas entradas cuando se opera en fallback degradado.
+
+### Configuración (`application.yml`)
+
+```yaml
+chaos:
+  enabled: false
+  ws-drop-rate-pct: 0           # % de mensajes WS perdidos/duplicados
+  api-burst429-seconds: 0       # duración de ráfagas 429/418
+  latency-multiplier: 1.0       # multiplicador de latencia en llamadas REST/WS
+  candles-gap-pattern: NONE     # NONE | SKIP_EVERY_10 | RANDOM_1PCT
+  clock-drift-ms: 0             # desfase del reloj local
+  safety:
+    max-duration-sec: 600       # timeout automático del escenario
+```
+
+### Endpoints ADMIN
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/admin/chaos/start` | Activa un escenario recibiendo un `ChaosRequest` parcial. |
+| `POST` | `/admin/chaos/stop` | Apaga cualquier escenario en curso (kill-switch). |
+| `GET` | `/admin/chaos/status` | Reporta estado actual, remaining time y salud del WS. |
+
+### Cómo ejecutar escenarios
+
+```bash
+curl -u admin:*** -X POST http://localhost:8080/admin/chaos/start \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "wsDropRatePct": 80,
+        "apiBurst429Seconds": 15,
+        "latencyMultiplier": 5.0,
+        "candlesGapPattern": "SKIP_EVERY_10",
+        "clockDriftMs": 2500,
+        "maxDurationSec": 120
+      }'
+
+# detener el caos
+curl -u admin:*** -X POST http://localhost:8080/admin/chaos/stop
+```
+
+### Criterios de éxito durante caos
+
+- El bot permanece operativo en modo degradado: cuando el WS cae, `TradingScheduler` conmuta a REST con ritmo limitado (`chaos.allowRestPoll`).
+- `RiskGuard` reporta `marketDataStale=true` y bloquea nuevas aperturas mientras los datos estén atrasados.
+- No se generan loops infinitos ni explosiones de colas gracias a `CandleSanitizer` y al `Throttle` reutilizado.
+- Métricas Micrometer expuestas: `chaos.ws_drops`, `chaos.api_429`, `chaos.latency_mult`, `chaos.active`, `risk.market_data_stale`.
+
+> **Pruebas recomendadas**: ejecutar escenarios extremos (`wsDropRatePct=100`, `latencyMultiplier=10`) y verificar que el bot pausa entradas nuevas, los servicios continúan respondiendo y los contadores se actualizan en Prometheus.
+
 ## Gestión intradía de VaR/CVaR y sizing dinámico
 
 - **Modelo de retorno**: cada trade se normaliza en R-múltiplos (`pnl_r`) con slippage observado (`slippage_bps`) proveniente de `vw_trades_enriched` y posiciones shadow. La cola se ajusta vía Cornish-Fisher o bootstrap pesado (`var.heavy_tails`).

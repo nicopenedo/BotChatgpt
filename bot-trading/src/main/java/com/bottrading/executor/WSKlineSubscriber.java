@@ -1,5 +1,6 @@
 package com.bottrading.executor;
 
+import com.bottrading.chaos.ChaosSuite;
 import com.bottrading.config.BinanceProperties;
 import com.bottrading.service.health.HealthService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -11,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.net.http.WebSocket.Listener;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -34,6 +36,7 @@ public class WSKlineSubscriber {
   private final ObjectMapper objectMapper;
   private final ScheduledExecutorService scheduler;
   private final HealthService healthService;
+  private final ChaosSuite chaosSuite;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean healthy = new AtomicBoolean(false);
   private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
@@ -43,9 +46,11 @@ public class WSKlineSubscriber {
   private volatile String symbol;
   private volatile String interval;
 
-  public WSKlineSubscriber(BinanceProperties binanceProperties, HealthService healthService) {
+  public WSKlineSubscriber(
+      BinanceProperties binanceProperties, HealthService healthService, ChaosSuite chaosSuite) {
     this.binanceProperties = binanceProperties;
     this.healthService = healthService;
+    this.chaosSuite = Objects.requireNonNull(chaosSuite, "chaosSuite");
     this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     this.objectMapper = new ObjectMapper();
     this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -112,6 +117,7 @@ public class WSKlineSubscriber {
   private void scheduleReconnect() {
     healthy.set(false);
     healthService.onWebsocketReconnect();
+    chaosSuite.onWebsocketState(false);
     if (!running.get()) {
       return;
     }
@@ -130,6 +136,7 @@ public class WSKlineSubscriber {
       reconnectAttempts.set(0);
       healthy.set(true);
       log.info("Websocket stream opened for {} {}", symbol, interval);
+      chaosSuite.onWebsocketState(true);
       webSocket.request(1);
     }
 
@@ -148,12 +155,14 @@ public class WSKlineSubscriber {
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
       log.error("Websocket error: {}", error.getMessage(), error);
+      chaosSuite.onWebsocketState(false);
       scheduleReconnect();
     }
 
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
       log.info("Websocket closed code={} reason={}", statusCode, reason);
+      chaosSuite.onWebsocketState(false);
       scheduleReconnect();
       return Listener.super.onClose(webSocket, statusCode, reason);
     }
@@ -174,7 +183,10 @@ public class WSKlineSubscriber {
         long closeTime = klineNode.path("T").asLong();
         Consumer<KlineEvent> currentListener = listener;
         if (currentListener != null) {
-          currentListener.accept(new KlineEvent(eventSymbol, eventInterval, closeTime, true));
+          List<KlineEvent> events = chaosSuite.applyWsChaos(new KlineEvent(eventSymbol, eventInterval, closeTime, true));
+          for (KlineEvent evt : events) {
+            currentListener.accept(evt);
+          }
         }
       } catch (IOException ex) {
         log.warn("Failed to parse websocket payload: {}", ex.getMessage());
