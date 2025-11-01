@@ -50,6 +50,12 @@
       avgQueue: document.getElementById('tcaAvgQueue'),
       recommendation: document.getElementById('tcaRecommendation'),
       hourlyBody: document.querySelector('#tcaHourlyTable tbody')
+    },
+    bandit: {
+      algorithm: document.getElementById('banditAlgorithm'),
+      canaryShare: document.getElementById('banditCanaryShare'),
+      armsBody: document.querySelector('#banditArmsTable tbody'),
+      pullsBody: document.querySelector('#banditPullsTable tbody')
     }
   };
 
@@ -476,6 +482,10 @@
     renderRegime(regimeStatusRes?.data);
     renderStatusCards(overviewRes?.data);
     renderTcaPanel(tcaRes?.data);
+    const regimePayload = regimeStatusRes?.data;
+    const currentTrend =
+      regimePayload?.status?.regime?.trend || regimePayload?.trend || regimePayload?.status?.trend;
+    loadBanditData(params.symbol, currentTrend);
   }
 
   function buildKpi(summary) {
@@ -557,6 +567,105 @@
     }));
     const max = Math.max(...values.map((v) => Math.abs(v.value)), 1);
     heatmapInstance.setData({ max, data: values });
+  }
+
+  function renderBanditArms(arms) {
+    const tbody = elements.bandit?.armsBody;
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!Array.isArray(arms) || !arms.length) {
+      const row = document.createElement('tr');
+      row.innerHTML = '<td colspan="6" class="text-muted">No bandit data</td>';
+      tbody.appendChild(row);
+      return;
+    }
+    const rows = arms.map((arm) => {
+      const preset = arm.presetId ? arm.presetId.substring(0, 8) : 'n/a';
+      const mean = Number.isFinite(arm.stats?.mean) ? arm.stats.mean.toFixed(3) : '--';
+      const variance = Number.isFinite(arm.stats?.variance)
+        ? arm.stats.variance.toFixed(3)
+        : '--';
+      return `
+        <tr>
+          <td title="${arm.presetId}">${preset}</td>
+          <td>${arm.stats?.pulls ?? 0}</td>
+          <td>${mean}</td>
+          <td>${variance}</td>
+          <td>${arm.status}</td>
+          <td>${arm.role}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = rows.join('');
+  }
+
+  function renderBanditPulls(pulls) {
+    const tbody = elements.bandit?.pullsBody;
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!Array.isArray(pulls) || !pulls.length) {
+      const row = document.createElement('tr');
+      row.innerHTML = '<td colspan="7" class="text-muted">No pulls recorded</td>';
+      tbody.appendChild(row);
+      return;
+    }
+    const rows = pulls.map((pull) => {
+      const preset = pull.armId ? pull.armId.substring(0, 8) : 'n/a';
+      const reward = Number.isFinite(pull.reward) ? pull.reward.toFixed(3) : '--';
+      const pnlR = Number.isFinite(pull.pnlR) ? pull.pnlR.toFixed(3) : '--';
+      const slippage = Number.isFinite(pull.slippageBps) ? pull.slippageBps.toFixed(2) : '--';
+      const fees = Number.isFinite(pull.feesBps) ? pull.feesBps.toFixed(2) : '--';
+      return `
+        <tr>
+          <td>${formatTs(pull.timestamp)}</td>
+          <td title="${pull.armId}">${preset}</td>
+          <td>${reward}</td>
+          <td>${pnlR}</td>
+          <td>${slippage}</td>
+          <td>${fees}</td>
+          <td>${pull.decisionId || ''}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = rows.join('');
+  }
+
+  function loadBanditData(symbol, trend) {
+    if (!elements.bandit?.armsBody) {
+      return;
+    }
+    const params = {
+      symbol,
+      regime: trend || undefined,
+      side: 'BUY'
+    };
+    Promise.all([
+      axios.get('/api/bandit/arms', { params }),
+      axios.get('/api/bandit/pulls', { params: { ...params, limit: 20 } }),
+      axios.get('/api/bandit/overview', { params: { symbol } })
+    ])
+      .then(([armsRes, pullsRes, overviewRes]) => {
+        renderBanditArms(armsRes.data || []);
+        renderBanditPulls(pullsRes.data || []);
+        if (overviewRes?.data) {
+          const overview = overviewRes.data;
+          if (elements.bandit.algorithm) {
+            elements.bandit.algorithm.textContent = `Algo: ${overview.algorithm}`;
+          }
+          if (elements.bandit.canaryShare) {
+            const pctShare = (Number(overview.candidateShare) * 100).toFixed(1);
+            elements.bandit.canaryShare.textContent = `Canary share: ${pctShare}%`;
+          }
+        }
+      })
+      .catch(() => {
+        renderBanditArms([]);
+        renderBanditPulls([]);
+        if (elements.bandit.algorithm) {
+          elements.bandit.algorithm.textContent = '';
+        }
+        if (elements.bandit.canaryShare) {
+          elements.bandit.canaryShare.textContent = '';
+        }
+      });
   }
 
   function renderRegime(payload) {

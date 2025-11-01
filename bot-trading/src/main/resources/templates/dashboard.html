@@ -252,6 +252,60 @@
         </div>
       </section>
 
+      <section class="row g-3 mt-3" id="banditPanel">
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Bandit Ranking</span>
+              <span class="text-muted small" id="banditAlgorithm"></span>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm" id="banditArmsTable">
+                  <thead>
+                    <tr>
+                      <th>Preset</th>
+                      <th>Pulls</th>
+                      <th>Reward μ</th>
+                      <th>Variance</th>
+                      <th>Status</th>
+                      <th>Role</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Bandit Recent Pulls</span>
+              <span class="text-muted small" id="banditCanaryShare"></span>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm" id="banditPullsTable">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Preset</th>
+                      <th>Reward</th>
+                      <th>PnL R</th>
+                      <th>Slip bps</th>
+                      <th>Fees bps</th>
+                      <th>Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="card shadow-sm mt-3">
         <div class="card-header d-flex justify-content-between">
           <span>Summary</span>
