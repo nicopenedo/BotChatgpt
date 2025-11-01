@@ -1,6 +1,6 @@
 package com.bottrading.service.strategy;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.bottrading.model.dto.Kline;
 import com.bottrading.model.dto.StrategySignal;
 import com.bottrading.model.enums.OrderSide;
@@ -20,10 +20,10 @@ import org.springframework.stereotype.Component;
 public class ScalpingSmaStrategy {
 
   private static final Logger log = LoggerFactory.getLogger(ScalpingSmaStrategy.class);
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProperties;
   private final Counter signals;
 
-  public ScalpingSmaStrategy(TradingProperties tradingProperties, MeterRegistry meterRegistry) {
+  public ScalpingSmaStrategy(TradingProps tradingProperties, MeterRegistry meterRegistry) {
     this.tradingProperties = tradingProperties;
     this.signals = meterRegistry.counter("strategy.signals");
   }

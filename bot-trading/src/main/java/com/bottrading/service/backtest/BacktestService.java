@@ -113,6 +113,7 @@ public class BacktestService implements ApplicationRunner {
       klines.add(
           new Kline(
               Instant.ofEpochMilli(Long.parseLong(entry.get(0).toString())),
+              Instant.ofEpochMilli(Long.parseLong(entry.get(6).toString())),
               new BigDecimal(entry.get(1).toString()),
               new BigDecimal(entry.get(2).toString()),
               new BigDecimal(entry.get(3).toString()),

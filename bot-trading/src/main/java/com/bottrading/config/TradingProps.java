@@ -1,12 +1,24 @@
 package com.bottrading.config;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "trading")
-public class TradingProperties {
+public class TradingProps {
+
+  private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
+
+  public enum Mode {
+    WEBSOCKET,
+    POLLING
+  }
 
   private String symbol = "BTCUSDT";
+  private String interval = "1m";
   private boolean liveEnabled = false;
   private BigDecimal maxDailyLossPct = BigDecimal.valueOf(2.0);
   private BigDecimal maxDrawdownPct = BigDecimal.valueOf(3.0);
@@ -15,6 +27,9 @@ public class TradingProperties {
   private int maxOrdersPerMinute = 5;
   private BigDecimal minVolume24h = BigDecimal.valueOf(1000);
   private boolean dryRun = true;
+  private String tradingHours = "00:00-23:59";
+  private Mode mode = Mode.WEBSOCKET;
+  private int jitterSeconds = 2;
 
   public String getSymbol() {
     return symbol;
@@ -22,6 +37,14 @@ public class TradingProperties {
 
   public void setSymbol(String symbol) {
     this.symbol = symbol;
+  }
+
+  public String getInterval() {
+    return interval;
+  }
+
+  public void setInterval(String interval) {
+    this.interval = interval;
   }
 
   public boolean isLiveEnabled() {
@@ -86,5 +109,51 @@ public class TradingProperties {
 
   public void setDryRun(boolean dryRun) {
     this.dryRun = dryRun;
+  }
+
+  public String getTradingHours() {
+    return tradingHours;
+  }
+
+  public void setTradingHours(String tradingHours) {
+    this.tradingHours = tradingHours;
+  }
+
+  public Mode getMode() {
+    return mode;
+  }
+
+  public void setMode(Mode mode) {
+    this.mode = mode;
+  }
+
+  public int getJitterSeconds() {
+    return jitterSeconds;
+  }
+
+  public void setJitterSeconds(int jitterSeconds) {
+    this.jitterSeconds = jitterSeconds;
+  }
+
+  public LocalTime getTradingWindowStart() {
+    return parseTradingWindow()[0];
+  }
+
+  public LocalTime getTradingWindowEnd() {
+    return parseTradingWindow()[1];
+  }
+
+  private LocalTime[] parseTradingWindow() {
+    if (tradingHours == null || !tradingHours.contains("-")) {
+      return new LocalTime[] {LocalTime.MIN, LocalTime.MAX};
+    }
+    String[] parts = tradingHours.split("-");
+    try {
+      LocalTime start = LocalTime.parse(parts[0].trim(), TIME_FORMAT.withLocale(Locale.US));
+      LocalTime end = LocalTime.parse(parts[1].trim(), TIME_FORMAT.withLocale(Locale.US));
+      return new LocalTime[] {start, end};
+    } catch (DateTimeParseException ex) {
+      return new LocalTime[] {LocalTime.MIN, LocalTime.MAX};
+    }
   }
 }

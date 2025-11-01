@@ -22,6 +22,7 @@ public class OrderRequest {
   @DecimalMin("0.0") private BigDecimal quoteAmount;
 
   private boolean dryRun;
+  private String clientOrderId;
 
   public String getSymbol() {
     return symbol;
@@ -77,5 +78,13 @@ public class OrderRequest {
 
   public void setDryRun(boolean dryRun) {
     this.dryRun = dryRun;
+  }
+
+  public String getClientOrderId() {
+    return clientOrderId;
+  }
+
+  public void setClientOrderId(String clientOrderId) {
+    this.clientOrderId = clientOrderId;
   }
 }

@@ -1,6 +1,6 @@
 package com.bottrading.config;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.giffing.bucket4j.spring.boot.starter.context.FilterConfiguration;
 import com.giffing.bucket4j.spring.boot.starter.context.filters.ServletRequestFilterConfiguration;
 import com.giffing.bucket4j.spring.boot.starter.context.metrics.MetricTagSupplier;
@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 public class RateLimitingConfig {
 
   @Bean
-  public FilterConfiguration servletFilterConfiguration(TradingProperties properties) {
+  public FilterConfiguration servletFilterConfiguration(TradingProps properties) {
     Bandwidth bandwidth =
         Bandwidth.classic(
             properties.getMaxOrdersPerMinute(),

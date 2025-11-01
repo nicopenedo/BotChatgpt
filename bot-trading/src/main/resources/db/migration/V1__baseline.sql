@@ -42,3 +42,16 @@ CREATE TABLE IF NOT EXISTS metrics_snapshots (
     drawdown_pct NUMERIC(18,8),
     daily_pnl_pct NUMERIC(18,8)
 );
+
+CREATE TABLE IF NOT EXISTS decisions (
+    decision_key VARCHAR(120) PRIMARY KEY,
+    symbol VARCHAR(50) NOT NULL,
+    interval VARCHAR(10) NOT NULL,
+    close_time TIMESTAMP NOT NULL,
+    side VARCHAR(10) NOT NULL,
+    confidence DOUBLE PRECISION,
+    reason TEXT,
+    decided_at TIMESTAMP NOT NULL,
+    executed BOOLEAN DEFAULT FALSE,
+    order_id VARCHAR(100)
+);

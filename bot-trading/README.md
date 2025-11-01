@@ -79,6 +79,9 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/api/account/balances?assets=USDT,BTC` | `READ` | Balances filtrados. |
 | POST | `/admin/kill-switch` | `ADMIN` | Activa kill switch. |
 | POST | `/admin/resume` | `ADMIN` | Desactiva kill switch. |
+| POST | `/admin/scheduler/enable` | `ADMIN` | Habilita el scheduler de velas. |
+| POST | `/admin/scheduler/disable` | `ADMIN` | Deshabilita el scheduler (modo mantenimiento). |
+| GET | `/admin/scheduler/status` | `ADMIN` | Devuelve modo (`ws`/`polling`), última `decisionKey`, flags y cooldown restante. |
 | GET | `/admin/live-enabled` | `ADMIN` | Consulta estado `liveEnabled`. |
 | GET | `/api/strategy/decide?symbol=BTCUSDT` | `READ` | Evalúa la estrategia compuesta y devuelve `side`, `confidence` y notas. |
 
@@ -87,7 +90,7 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 - `CompositeStrategy` permite ponderar cada señal mediante `weight` y aplicar filtros. Si un filtro devuelve `FLAT` la operación se aborta.
 - La configuración se controla desde [`src/main/resources/strategy.yml`](src/main/resources/strategy.yml). Se pueden activar/desactivar señales, ajustar parámetros (periodos, umbrales, multiplicadores) y definir los umbrales globales `buy`/`sell`.
 - `StrategyFactory` carga el YAML (o usa defaults sensatos) y expone una `CompositeStrategy` lista para usarse. El servicio `StrategyService` convierte los klines en series numéricas, aplica filtros (por ejemplo 24h volume) y devuelve `SignalResult`.
-- El scheduler `StrategyExecutionScheduler` consulta `StrategyService`, respeta `RiskGuard`, `TradingState`, normaliza ordenes (`tickSize`, `stepSize`, `minNotional`) y ejecuta órdenes vía `OrderService`/`BinanceClient`. El `note` de cada señal queda en los logs para trazabilidad.
+- El scheduler `TradingScheduler` opera en **modo vela (WS/polling)**: escucha `kline@interval` por WebSocket con reconexión exponencial y cae a polling consciente de cierres cuando el stream no está disponible. Asegura idempotencia por `decisionKey`, respeta `TradingState`, `RiskGuard`, ventanas horarias, volumen 24h, rate limits internos y normaliza órdenes antes de delegar en `OrderExecutionService`.
 - Endpoint REST: `/api/strategy/decide` devuelve la última evaluación. Ideal para dashboards o monitoreo manual.
 - Warm-up: cada señal valida si existen velas suficientes antes de emitir voto. El número de velas (p.ej. 200 para 1m) se controla en `StrategyService`. Si falta histórico, la estrategia retorna `FLAT`.
 - Tests unitarios cubren cruces SMA/EMA, MACD, RSI, Bollinger, Supertrend, composición y el motor de backtest/GA.
@@ -97,12 +100,13 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 - Endpoints públicos: únicamente `/actuator/health`.
 
 ### Rate limiting
-- Bucket4j limita `/api/trade/**` a `maxOrdersPerMinute` configurado en `TradingProperties`.
+- Bucket4j limita `/api/trade/**` a `maxOrdersPerMinute` configurado en `TradingProps`.
 
 ## Observabilidad
 - Métricas en `/actuator/prometheus`.
 - Salud en `/actuator/health`.
-- Contadores: `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
+- Contadores: `scheduler.candle.decisions{result=BUY|SELL|FLAT|SKIPPED,...}`, `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
+- Temporizador: `scheduler.candle.duration.ms`.
 - Gauges: `risk.drawdown`, `risk.equity`.
 
 ## Research: Backtesting & GA

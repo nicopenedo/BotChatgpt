@@ -1,6 +1,6 @@
 package com.bottrading.service.risk;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -18,7 +18,7 @@ public class RiskGuard {
 
   private static final Logger log = LoggerFactory.getLogger(RiskGuard.class);
 
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProperties;
   private final TradingState tradingState;
   private final Counter stopouts;
   private final AtomicReference<BigDecimal> equityStart =
@@ -29,7 +29,7 @@ public class RiskGuard {
       new AtomicReference<>(BigDecimal.ZERO);
   private final AtomicReference<Instant> lastReset = new AtomicReference<>(Instant.now());
 
-  public RiskGuard(TradingProperties tradingProperties, TradingState tradingState, MeterRegistry meterRegistry) {
+  public RiskGuard(TradingProps tradingProperties, TradingState tradingState, MeterRegistry meterRegistry) {
     this.tradingProperties = tradingProperties;
     this.tradingState = tradingState;
     this.stopouts = meterRegistry.counter("risk.stopouts", Tags.empty());

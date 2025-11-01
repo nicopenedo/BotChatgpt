@@ -1,6 +1,6 @@
 package com.bottrading.service;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.bottrading.model.dto.Kline;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.strategy.CompositeStrategy;
@@ -22,18 +22,19 @@ public class StrategyService {
 
   private final BinanceClient binanceClient;
   private final StrategyFactory strategyFactory;
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProps;
 
   public StrategyService(
-      BinanceClient binanceClient, StrategyFactory strategyFactory, TradingProperties tradingProperties) {
+      BinanceClient binanceClient, StrategyFactory strategyFactory, TradingProps tradingProps) {
     this.binanceClient = binanceClient;
     this.strategyFactory = strategyFactory;
-    this.tradingProperties = tradingProperties;
+    this.tradingProps = tradingProps;
   }
 
   public SignalResult decide(String symbol) {
-    String effectiveSymbol = symbol != null ? symbol : tradingProperties.getSymbol();
-    List<Kline> klines = binanceClient.getKlines(effectiveSymbol, "1m", DEFAULT_KLINE_LIMIT);
+    String effectiveSymbol = symbol != null ? symbol : tradingProps.getSymbol();
+    String interval = tradingProps.getInterval();
+    List<Kline> klines = binanceClient.getKlines(effectiveSymbol, interval, DEFAULT_KLINE_LIMIT);
     if (klines == null || klines.isEmpty()) {
       log.warn("No klines available for symbol {}", effectiveSymbol);
       return SignalResult.flat("No klines available");

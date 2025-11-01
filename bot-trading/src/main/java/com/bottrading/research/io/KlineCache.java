@@ -27,18 +27,25 @@ public class KlineCache {
       List<Kline> klines = new ArrayList<>();
       List<String> lines = Files.readAllLines(file);
       for (String line : lines) {
-        if (line.startsWith("timestamp")) {
+        if (line.startsWith("open_time")) {
           continue;
         }
         String[] parts = line.split(",");
+        Instant open = Instant.ofEpochMilli(Long.parseLong(parts[0]));
+        Instant close =
+            parts.length > 6
+                ? Instant.ofEpochMilli(Long.parseLong(parts[1]))
+                : open.plusSeconds(60);
+        int offset = parts.length > 6 ? 1 : 0;
         klines.add(
             new Kline(
-                Instant.ofEpochMilli(Long.parseLong(parts[0])),
-                new BigDecimal(parts[1]),
-                new BigDecimal(parts[2]),
-                new BigDecimal(parts[3]),
-                new BigDecimal(parts[4]),
-                new BigDecimal(parts[5])));
+                open,
+                close,
+                new BigDecimal(parts[1 + offset]),
+                new BigDecimal(parts[2 + offset]),
+                new BigDecimal(parts[3 + offset]),
+                new BigDecimal(parts[4 + offset]),
+                new BigDecimal(parts[5 + offset])));
       }
       return Optional.of(klines);
     } catch (IOException ex) {
@@ -53,12 +60,13 @@ public class KlineCache {
       }
       Path file = cacheDir.resolve(symbol + "-" + interval + ".csv");
       List<String> lines = new ArrayList<>();
-      lines.add("timestamp,open,high,low,close,volume");
+      lines.add("open_time,close_time,open,high,low,close,volume");
       for (Kline kline : klines) {
         lines.add(
-            "%d,%s,%s,%s,%s,%s"
+            "%d,%d,%s,%s,%s,%s,%s"
                 .formatted(
                     kline.openTime().toEpochMilli(),
+                    kline.closeTime().toEpochMilli(),
                     kline.open().toPlainString(),
                     kline.high().toPlainString(),
                     kline.low().toPlainString(),

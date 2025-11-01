@@ -5,6 +5,7 @@ import java.time.Instant;
 
 public record Kline(
     Instant openTime,
+    Instant closeTime,
     BigDecimal open,
     BigDecimal high,
     BigDecimal low,
