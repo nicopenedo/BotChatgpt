@@ -222,6 +222,51 @@
         </div>
       </section>
 
+      <section class="card shadow-sm mt-3" id="pnlAttrCard">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>PnL Attribution</span>
+          <small class="text-muted" id="pnlAttrMeta">--</small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3 align-items-stretch">
+            <div class="col-lg-8">
+              <canvas id="pnlAttrChart" height="260"></canvas>
+            </div>
+            <div class="col-lg-4 d-flex flex-column gap-2">
+              <div class="pnl-metric">
+                <div class="text-muted small">Avg Slippage (bps)</div>
+                <div class="fs-5 fw-semibold" id="pnlAttrSlippageAvg">--</div>
+              </div>
+              <div class="pnl-metric">
+                <div class="text-muted small">Avg Timing (bps)</div>
+                <div class="fs-5 fw-semibold" id="pnlAttrTimingAvg">--</div>
+              </div>
+              <div class="pnl-metric">
+                <div class="text-muted small">Avg Fees (bps)</div>
+                <div class="fs-5 fw-semibold" id="pnlAttrFeesAvg">--</div>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive mt-3">
+            <table class="table table-sm" id="pnlAttrSymbolTable">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Avg Slip (bps)</th>
+                  <th>Worst Slip</th>
+                  <th>Best Slip</th>
+                  <th>Avg Timing</th>
+                  <th>Worst Timing</th>
+                  <th>Best Timing</th>
+                  <th>Net PnL</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="card shadow-sm mt-3">
         <div class="card-header d-flex justify-content-between">
           <span>Trades</span>
@@ -241,9 +286,15 @@
                   <th>Price</th>
                   <th>Qty</th>
                   <th>Fee</th>
-                  <th>PnL</th>
+                  <th>Fee (bps)</th>
+                  <th>PnL Gross</th>
+                  <th>PnL Net</th>
+                  <th>Signal Edge</th>
                   <th>PnL (R)</th>
                   <th>Slippage (bps)</th>
+                  <th>Slippage ($)</th>
+                  <th>Timing (bps)</th>
+                  <th>Timing ($)</th>
                   <th>Note</th>
                 </tr>
               </thead>

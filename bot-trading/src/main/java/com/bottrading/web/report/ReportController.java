@@ -2,6 +2,9 @@ package com.bottrading.web.report;
 
 import com.bottrading.model.dto.report.AnnotationDto;
 import com.bottrading.model.dto.report.HeatmapResponse;
+import com.bottrading.model.dto.report.PnlAttributionGroup;
+import com.bottrading.model.dto.report.PnlAttributionMetrics;
+import com.bottrading.model.dto.report.PnlAttributionSymbolStats;
 import com.bottrading.model.dto.report.SummaryBucket;
 import com.bottrading.model.dto.report.TimePoint;
 import com.bottrading.model.dto.report.TradeDto;
@@ -100,6 +103,33 @@ public class ReportController {
       @RequestParam(required = false) String to,
       @RequestParam(defaultValue = "hour") String bucket) {
     return reportService.heatmap(symbol, parseInstant(from), parseInstant(to), bucket);
+  }
+
+  @GetMapping("/pnl-attr/breakdown")
+  @PreAuthorize("hasRole('VIEWER')")
+  public List<PnlAttributionGroup> pnlAttributionBreakdown(
+      @RequestParam(required = false) String symbol,
+      @RequestParam(required = false) String from,
+      @RequestParam(required = false) String to) {
+    return reportService.pnlAttributionBreakdown(symbol, parseInstant(from), parseInstant(to));
+  }
+
+  @GetMapping("/pnl-attr/stats")
+  @PreAuthorize("hasRole('VIEWER')")
+  public List<PnlAttributionSymbolStats> pnlAttributionStats(
+      @RequestParam(required = false) String symbol,
+      @RequestParam(required = false) String from,
+      @RequestParam(required = false) String to) {
+    return reportService.pnlAttributionSymbolStats(symbol, parseInstant(from), parseInstant(to));
+  }
+
+  @GetMapping("/pnl-attr/metrics")
+  @PreAuthorize("hasRole('VIEWER')")
+  public PnlAttributionMetrics pnlAttributionMetrics(
+      @RequestParam(required = false) String symbol,
+      @RequestParam(required = false) String from,
+      @RequestParam(required = false) String to) {
+    return reportService.pnlAttributionMetrics(symbol, parseInstant(from), parseInstant(to));
   }
 
   @GetMapping(value = "/heatmap/export.csv", produces = "text/csv")
@@ -219,7 +249,8 @@ public class ReportController {
     static String trades(List<TradeDto> trades) {
       StringBuilder sb = new StringBuilder();
       sb.append(
-              "id,executedAt,symbol,side,price,quantity,fee,pnl,pnlR,slippageBps,clientOrderId,decisionKey,decisionNote")
+              "id,executedAt,symbol,side,price,quantity,fee,feesBps,pnl,pnlNet,signalEdge,pnlR,slippageBps,slippageCost,"
+                  + "timingBps,timingCost,clientOrderId,decisionKey,decisionNote")
           .append(NEWLINE);
       for (TradeDto trade : trades) {
         sb.append(trade.id()).append(',')
@@ -229,9 +260,15 @@ public class ReportController {
             .append(toString(trade.price())).append(',')
             .append(toString(trade.quantity())).append(',')
             .append(toString(trade.fee())).append(',')
+            .append(toString(trade.feesBps())).append(',')
             .append(toString(trade.pnl())).append(',')
+            .append(toString(trade.pnlNet())).append(',')
+            .append(toString(trade.signalEdge())).append(',')
             .append(toString(trade.pnlR())).append(',')
             .append(toString(trade.slippageBps())).append(',')
+            .append(toString(trade.slippageCost())).append(',')
+            .append(toString(trade.timingBps())).append(',')
+            .append(toString(trade.timingCost())).append(',')
             .append(nullToEmpty(trade.clientOrderId())).append(',')
             .append(nullToEmpty(trade.decisionKey())).append(',')
             .append(escapeCsv(trade.decisionNote()))

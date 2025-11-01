@@ -4,6 +4,9 @@ import com.bottrading.config.CacheConfig;
 import com.bottrading.model.dto.report.AnnotationDto;
 import com.bottrading.model.dto.report.HeatmapCell;
 import com.bottrading.model.dto.report.HeatmapResponse;
+import com.bottrading.model.dto.report.PnlAttributionGroup;
+import com.bottrading.model.dto.report.PnlAttributionMetrics;
+import com.bottrading.model.dto.report.PnlAttributionSymbolStats;
 import com.bottrading.model.dto.report.SummaryBucket;
 import com.bottrading.model.dto.report.TimePoint;
 import com.bottrading.model.dto.report.TradeDto;
@@ -166,6 +169,122 @@ public class DefaultReportService implements ReportService {
     return new HeatmapResponse(xLabels, yLabels, cells);
   }
 
+  @Override
+  public List<PnlAttributionGroup> pnlAttributionBreakdown(String symbol, Instant from, Instant to) {
+    MapSqlParameterSource params = new MapSqlParameterSource();
+    StringBuilder sql =
+        new StringBuilder(
+            "SELECT COALESCE(preset, 'N/A') AS preset, "
+                + "COALESCE(regime, 'N/A') AS regime, "
+                + "SUM(pnl_gross) AS pnl_gross, "
+                + "SUM(signal_edge) AS signal_edge, "
+                + "SUM(timing_cost) AS timing_cost, "
+                + "SUM(slippage_cost) AS slippage_cost, "
+                + "SUM(fees_cost) AS fees_cost, "
+                + "SUM(pnl_net) AS pnl_net, "
+                + "COUNT(*) AS trades "
+                + "FROM pnl_attr WHERE 1=1");
+    applyAttributionFilters(symbol, from, to, params, sql);
+    sql.append(" GROUP BY COALESCE(preset, 'N/A'), COALESCE(regime, 'N/A')");
+    sql.append(" ORDER BY SUM(pnl_net) DESC");
+    return jdbcTemplate.query(
+        sql.toString(),
+        params,
+        (rs, rowNum) ->
+            new PnlAttributionGroup(
+                rs.getString("preset"),
+                rs.getString("regime"),
+                rs.getBigDecimal("pnl_gross"),
+                rs.getBigDecimal("signal_edge"),
+                rs.getBigDecimal("timing_cost"),
+                rs.getBigDecimal("slippage_cost"),
+                rs.getBigDecimal("fees_cost"),
+                rs.getBigDecimal("pnl_net"),
+                rs.getLong("trades")));
+  }
+
+  @Override
+  public List<PnlAttributionSymbolStats> pnlAttributionSymbolStats(
+      String symbol, Instant from, Instant to) {
+    MapSqlParameterSource params = new MapSqlParameterSource();
+    StringBuilder sql =
+        new StringBuilder(
+            "SELECT symbol, "
+                + "SUM(slippage_cost) AS slippage_sum, "
+                + "SUM(timing_cost) AS timing_sum, "
+                + "SUM(notional) AS notional_sum, "
+                + "MAX(slippage_bps) AS slippage_max, "
+                + "MIN(slippage_bps) AS slippage_min, "
+                + "MAX(timing_bps) AS timing_max, "
+                + "MIN(timing_bps) AS timing_min, "
+                + "SUM(pnl_net) AS pnl_net "
+                + "FROM pnl_attr WHERE 1=1");
+    applyAttributionFilters(symbol, from, to, params, sql);
+    sql.append(" GROUP BY symbol");
+    if (!StringUtils.hasText(symbol)) {
+      sql.append(" ORDER BY ABS(COALESCE(MAX(slippage_bps), 0)) DESC LIMIT 10");
+    }
+    return jdbcTemplate.query(
+        sql.toString(),
+        params,
+        (rs, rowNum) -> {
+          double notional = Optional.ofNullable(rs.getBigDecimal("notional_sum")).map(BigDecimal::doubleValue).orElse(0.0);
+          double slippageSum =
+              Optional.ofNullable(rs.getBigDecimal("slippage_sum")).map(BigDecimal::doubleValue).orElse(0.0);
+          double timingSum =
+              Optional.ofNullable(rs.getBigDecimal("timing_sum")).map(BigDecimal::doubleValue).orElse(0.0);
+          double avgSlippage = notional == 0.0 ? 0.0 : slippageSum / notional * 10_000d;
+          double avgTiming = notional == 0.0 ? 0.0 : timingSum / notional * 10_000d;
+          return new PnlAttributionSymbolStats(
+              rs.getString("symbol"),
+              avgSlippage,
+              Optional.ofNullable(rs.getBigDecimal("slippage_max")).map(BigDecimal::doubleValue).orElse(Double.NaN),
+              Optional.ofNullable(rs.getBigDecimal("slippage_min")).map(BigDecimal::doubleValue).orElse(Double.NaN),
+              avgTiming,
+              Optional.ofNullable(rs.getBigDecimal("timing_max")).map(BigDecimal::doubleValue).orElse(Double.NaN),
+              Optional.ofNullable(rs.getBigDecimal("timing_min")).map(BigDecimal::doubleValue).orElse(Double.NaN),
+              Optional.ofNullable(rs.getBigDecimal("pnl_net")).map(BigDecimal::doubleValue).orElse(0.0));
+        });
+  }
+
+  @Override
+  public PnlAttributionMetrics pnlAttributionMetrics(String symbol, Instant from, Instant to) {
+    MapSqlParameterSource params = new MapSqlParameterSource();
+    StringBuilder totalsSql = new StringBuilder("SELECT SUM(timing_cost) AS timing_sum, SUM(fees_cost) AS fees_sum, SUM(notional) AS notional_sum FROM pnl_attr WHERE 1=1");
+    applyAttributionFilters(symbol, from, to, params, totalsSql);
+    Map<String, Object> totals = jdbcTemplate.queryForMap(totalsSql.toString(), params);
+    double notional = optionalBigDecimal(totals.get("notional_sum"));
+    double timingAvg = notional == 0.0 ? 0.0 : optionalBigDecimal(totals.get("timing_sum")) / notional * 10_000d;
+    double feesAvg = notional == 0.0 ? 0.0 : optionalBigDecimal(totals.get("fees_sum")) / notional * 10_000d;
+
+    MapSqlParameterSource symbolParams = new MapSqlParameterSource();
+    StringBuilder perSymbol = new StringBuilder("SELECT symbol, SUM(slippage_cost) AS slip_sum, SUM(notional) AS notional_sum FROM pnl_attr WHERE 1=1");
+    applyAttributionFilters(symbol, from, to, symbolParams, perSymbol);
+    perSymbol.append(" GROUP BY symbol");
+    Map<String, Double> averages =
+        Optional.ofNullable(
+                jdbcTemplate.query(
+                    perSymbol.toString(),
+                    symbolParams,
+                    rs -> {
+                      Map<String, Double> map = new LinkedHashMap<>();
+                      while (rs.next()) {
+                        double symbolNotional = optionalBigDecimal(rs.getBigDecimal("notional_sum"));
+                        double slipAvg =
+                            symbolNotional == 0.0
+                                ? 0.0
+                                : optionalBigDecimal(rs.getBigDecimal("slip_sum"))
+                                    / symbolNotional
+                                    * 10_000d;
+                        map.put(rs.getString("symbol"), slipAvg);
+                      }
+                      return map;
+                    }))
+            .orElseGet(Collections::emptyMap);
+
+    return new PnlAttributionMetrics(timingAvg, feesAvg, averages);
+  }
+
   private void applyFilters(
       String symbol,
       Instant from,
@@ -196,6 +315,32 @@ public class DefaultReportService implements ReportService {
     }
   }
 
+  private void applyAttributionFilters(
+      String symbol, Instant from, Instant to, MapSqlParameterSource params, StringBuilder sql) {
+    if (StringUtils.hasText(symbol)) {
+      sql.append(" AND symbol = :attr_symbol");
+      params.addValue("attr_symbol", symbol);
+    }
+    if (from != null) {
+      sql.append(" AND ts >= :attr_from");
+      params.addValue("attr_from", from);
+    }
+    if (to != null) {
+      sql.append(" AND ts <= :attr_to");
+      params.addValue("attr_to", to);
+    }
+  }
+
+  private double optionalBigDecimal(Object value) {
+    if (value instanceof BigDecimal bigDecimal) {
+      return bigDecimal.doubleValue();
+    }
+    if (value instanceof Number number) {
+      return number.doubleValue();
+    }
+    return 0.0;
+  }
+
   private long count(String base, MapSqlParameterSource params, StringBuilder filters) {
     String countSql = base + filters.substring("SELECT * FROM vw_trades_enriched".length());
     return Optional.ofNullable(jdbcTemplate.queryForObject(countSql, params, Long.class)).orElse(0L);
@@ -203,8 +348,20 @@ public class DefaultReportService implements ReportService {
 
   private String resolveSort(Sort.Order order) {
     String property = switch (order.getProperty()) {
-      case "price", "quantity", "fee", "pnl", "symbol", "side" -> order.getProperty();
+      case "price",
+          "quantity",
+          "fee",
+          "feesBps",
+          "pnl",
+          "pnlNet",
+          "signalEdge",
+          "slippageBps",
+          "timingBps",
+          "symbol",
+          "side" -> order.getProperty();
       case "executedAt" -> "executed_at";
+      case "slippageCost" -> "slippage_cost";
+      case "timingCost" -> "timing_cost";
       default -> "executed_at";
     };
     return property + (order.isAscending() ? " ASC" : " DESC");
@@ -220,9 +377,15 @@ public class DefaultReportService implements ReportService {
             rs.getBigDecimal("price"),
             rs.getBigDecimal("quantity"),
             rs.getBigDecimal("fee"),
+            rs.getBigDecimal("fees_bps"),
             rs.getBigDecimal("pnl"),
+            rs.getBigDecimal("pnl_net"),
+            rs.getBigDecimal("signal_edge"),
             rs.getBigDecimal("pnl_r"),
             rs.getBigDecimal("slippage_bps"),
+            rs.getBigDecimal("slippage_cost"),
+            rs.getBigDecimal("timing_bps"),
+            rs.getBigDecimal("timing_cost"),
             rs.getString("client_order_id"),
             rs.getString("decision_key"),
             rs.getString("decision_note"));
