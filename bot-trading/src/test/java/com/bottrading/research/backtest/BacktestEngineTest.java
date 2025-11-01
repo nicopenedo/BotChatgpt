@@ -60,6 +60,7 @@ class BacktestEngineTest {
             null,
             "test",
             false,
+            null,
             null);
     BacktestResult result = engine.run(request, null, strategy);
 

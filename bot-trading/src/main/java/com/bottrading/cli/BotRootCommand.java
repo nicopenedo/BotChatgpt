@@ -13,7 +13,7 @@ import picocli.CommandLine;
 @Component
 @CommandLine.Command(
     name = "bot",
-    subcommands = {PresetsCommand.class, LeaderboardCliCommand.class},
+    subcommands = {PresetsCommand.class, LeaderboardCliCommand.class, BacktestCliCommand.class},
     mixinStandardHelpOptions = true,
     description = "Bot management CLI")
 public class BotRootCommand implements Runnable {
@@ -25,7 +25,7 @@ public class BotRootCommand implements Runnable {
 
   public boolean handles(String arg) {
     return switch (arg) {
-      case "presets", "leaderboard" -> true;
+      case "presets", "leaderboard", "bt" -> true;
       default -> false;
     };
   }

@@ -14,9 +14,10 @@ public final class MetricsCalculator {
 
   private MetricsCalculator() {}
 
-  public static MetricsSummary compute(List<TradeRecord> trades, List<EquityPoint> equityCurve) {
+  public static MetricsSummary compute(
+      List<TradeRecord> trades, List<EquityPoint> equityCurve, ExecutionStatistics stats) {
     if (equityCurve.isEmpty()) {
-      return empty();
+      return empty(stats);
     }
     BigDecimal start = equityCurve.get(0).equity();
     BigDecimal end = equityCurve.get(equityCurve.size() - 1).equity();
@@ -43,12 +44,18 @@ public final class MetricsCalculator {
     BigDecimal totalProfit = BigDecimal.ZERO;
     BigDecimal totalLoss = BigDecimal.ZERO;
     BigDecimal wins = BigDecimal.ZERO;
+    BigDecimal sumR = BigDecimal.ZERO;
+    int countR = 0;
     for (TradeRecord trade : trades) {
       if (trade.pnl().compareTo(BigDecimal.ZERO) >= 0) {
         totalProfit = totalProfit.add(trade.pnl(), MC);
         wins = wins.add(BigDecimal.ONE);
       } else {
         totalLoss = totalLoss.add(trade.pnl().abs(), MC);
+      }
+      if (trade.riskMultiple() != null) {
+        sumR = sumR.add(trade.riskMultiple(), MC);
+        countR++;
       }
     }
     BigDecimal profitFactor =
@@ -58,6 +65,9 @@ public final class MetricsCalculator {
     BigDecimal winRate = trades.isEmpty() ? BigDecimal.ZERO : wins.divide(BigDecimal.valueOf(trades.size()), MC);
     BigDecimal expectancy = trades.isEmpty() ? BigDecimal.ZERO : end.subtract(start, MC).divide(BigDecimal.valueOf(trades.size()), MC);
     BigDecimal exposure = exposure(trades, startTime, endTime);
+    BigDecimal averageR = countR == 0 ? BigDecimal.ZERO : sumR.divide(BigDecimal.valueOf(countR), MC);
+    BigDecimal fillRate = stats == null ? BigDecimal.ZERO : stats.fillRate();
+    BigDecimal ttlExpiredRate = stats == null ? BigDecimal.ZERO : stats.ttlExpiredRate();
 
     return new MetricsSummary(
         cagr,
@@ -68,13 +78,18 @@ public final class MetricsCalculator {
         profitFactor,
         winRate,
         expectancy,
+        averageR,
         trades.size(),
-        exposure);
+        exposure,
+        fillRate,
+        ttlExpiredRate);
   }
 
-  private static MetricsSummary empty() {
+  private static MetricsSummary empty(ExecutionStatistics stats) {
     BigDecimal zero = BigDecimal.ZERO;
-    return new MetricsSummary(zero, zero, zero, zero, zero, zero, zero, zero, 0, zero);
+    BigDecimal fillRate = stats == null ? zero : stats.fillRate();
+    BigDecimal ttlExpired = stats == null ? zero : stats.ttlExpiredRate();
+    return new MetricsSummary(zero, zero, zero, zero, zero, zero, zero, zero, zero, 0, zero, fillRate, ttlExpired);
   }
 
   private static BigDecimal maxDrawdown(List<EquityPoint> curve) {

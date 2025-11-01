@@ -19,41 +19,53 @@ public class Portfolio {
   private Instant openTime;
   private BigDecimal entryPrice;
   private TradeMetadata entryMetadata;
+  private List<FillDetail> entryFills = List.of();
+  private BigDecimal entryFees = BigDecimal.ZERO;
+  private BigDecimal entrySlippageBps = BigDecimal.ZERO;
+  private BigDecimal entryQueueTimeMs = BigDecimal.ZERO;
+  private BigDecimal entryRequestedQuantity = BigDecimal.ZERO;
+  private BigDecimal entryNotional = BigDecimal.ZERO;
+  private ExecutionResult.ExecutionType entryExecutionType = ExecutionResult.ExecutionType.LIMIT;
 
   public Portfolio(BigDecimal startingCapital) {
     this.quoteBalance = startingCapital;
   }
 
-  public void buy(
-      Instant time,
-      BigDecimal price,
-      BigDecimal quantity,
-      BigDecimal fee,
-      TradeMetadata metadata) {
+  public boolean buy(ExecutionResult execution, TradeMetadata metadata) {
     if (basePosition.compareTo(BigDecimal.ZERO) > 0) {
-      return;
+      return false;
     }
-    BigDecimal cost = price.multiply(quantity, mc).add(fee);
-    quoteBalance = quoteBalance.subtract(cost, mc);
-    basePosition = quantity;
-    entryPrice = price;
-    openTime = time;
+    if (execution == null || !execution.hasFill()) {
+      return false;
+    }
+    BigDecimal notional = execution.totalNotional();
+    BigDecimal fee = execution.totalFee();
+    quoteBalance = quoteBalance.subtract(notional.add(fee, mc), mc);
+    basePosition = execution.quantity();
+    entryPrice = execution.averagePrice();
+    openTime = execution.firstFillTime();
     entryMetadata = metadata;
+    entryFills = List.copyOf(execution.fills());
+    entryFees = fee;
+    entrySlippageBps = execution.slippageBps();
+    entryQueueTimeMs = execution.averageQueueTimeMs();
+    entryRequestedQuantity = execution.requestedQuantity();
+    entryNotional = notional;
+    entryExecutionType = execution.executionType();
+    return true;
   }
 
-  public void sell(
-      Instant time,
-      BigDecimal price,
-      BigDecimal quantity,
-      BigDecimal fee,
-      TradeMetadata metadata) {
+  public void sell(ExecutionResult execution, TradeMetadata metadata) {
     if (basePosition.compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
-    BigDecimal proceeds = price.multiply(quantity, mc).subtract(fee);
+    if (execution == null || !execution.hasFill()) {
+      return;
+    }
+    BigDecimal proceeds = execution.totalNotional().subtract(execution.totalFee(), mc);
     quoteBalance = quoteBalance.add(proceeds, mc);
     BigDecimal pnl =
-        price.subtract(entryPrice, mc).multiply(quantity, mc).subtract(fee, mc);
+        proceeds.subtract(entryNotional.add(entryFees, mc), mc);
     boolean win = pnl.compareTo(BigDecimal.ZERO) > 0;
     TradeMetadata meta = entryMetadata != null ? entryMetadata : TradeMetadata.empty(SignalSide.BUY);
     TradeMetadata exitMeta = metadata != null ? metadata : TradeMetadata.empty(SignalSide.SELL);
@@ -61,20 +73,34 @@ public class Portfolio {
         new TradeRecord(
             openTime,
             entryPrice,
-            time,
-            price,
-            quantity,
+            execution.firstFillTime(),
+            execution.averagePrice(),
+            execution.quantity(),
             pnl,
             win,
             meta.side(),
             meta.reason(),
             exitMeta.reason(),
             meta.signals(),
-            exitMeta.signals()));
+            exitMeta.signals(),
+            entryFills,
+            List.copyOf(execution.fills()),
+            entryFees.add(execution.totalFee(), mc),
+            entrySlippageBps.add(execution.slippageBps(), mc),
+            entryQueueTimeMs.add(execution.averageQueueTimeMs(), mc).divide(BigDecimal.valueOf(2), mc),
+            riskMultiple(pnl, execution.quantity()),
+            entryExecutionType,
+            execution.executionType()));
     basePosition = BigDecimal.ZERO;
     entryPrice = null;
     openTime = null;
     entryMetadata = null;
+    entryFills = List.of();
+    entryFees = BigDecimal.ZERO;
+    entrySlippageBps = BigDecimal.ZERO;
+    entryQueueTimeMs = BigDecimal.ZERO;
+    entryRequestedQuantity = BigDecimal.ZERO;
+    entryNotional = BigDecimal.ZERO;
   }
 
   public void mark(Instant time, BigDecimal price) {
@@ -106,6 +132,21 @@ public class Portfolio {
 
   public List<EquityPoint> equityCurve() {
     return equityCurve;
+  }
+
+  public BigDecimal entryRequestedQuantity() {
+    return entryRequestedQuantity;
+  }
+
+  private BigDecimal riskMultiple(BigDecimal pnl, BigDecimal quantity) {
+    if (quantity == null || quantity.compareTo(BigDecimal.ZERO) == 0) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal risk = entryPrice == null ? BigDecimal.ZERO : entryPrice.multiply(quantity, mc);
+    if (risk.compareTo(BigDecimal.ZERO) == 0) {
+      return BigDecimal.ZERO;
+    }
+    return pnl.divide(risk, mc);
   }
 
   public record TradeMetadata(SignalSide side, String reason, List<String> signals) {

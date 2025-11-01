@@ -104,6 +104,7 @@ public class ResearchRunner implements ApplicationRunner {
             seed,
             runId,
             true,
+            null,
             null);
     try {
       BacktestResult result = backtestEngine.run(request, reportDir);
@@ -175,7 +176,8 @@ public class ResearchRunner implements ApplicationRunner {
             seed,
             runId,
             true,
-            regimeFilter);
+            regimeFilter,
+            null);
 
     Genome best;
     if (wfSplits != null) {

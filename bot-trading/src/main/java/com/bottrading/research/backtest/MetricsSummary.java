@@ -11,5 +11,8 @@ public record MetricsSummary(
     BigDecimal profitFactor,
     BigDecimal winRate,
     BigDecimal expectancy,
+    BigDecimal averageR,
     int trades,
-    BigDecimal exposure) {}
+    BigDecimal exposure,
+    BigDecimal fillRate,
+    BigDecimal ttlExpiredRate) {}
