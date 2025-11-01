@@ -20,6 +20,18 @@ risk:
   forceCloseOnPause: true
   maxOpeningsPerDay: 10
   maxTradeNotional: 0
+anomaly:
+  enabled: true
+  window: 300
+  minSamples: 200
+  coolDownSec: 900
+  zscore:
+    warn: 2.5
+    mitigate: 3.5
+  actions:
+    severe: PAUSE
+    high: SIZE_DOWN_50
+    medium: SWITCH_TO_MARKET
 throttle:
   window1s: 1200
   window60s: 72000

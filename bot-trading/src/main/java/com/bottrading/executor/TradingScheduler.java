@@ -7,6 +7,7 @@ import com.bottrading.model.dto.Kline;
 import com.bottrading.repository.DecisionRepository;
 import com.bottrading.service.OrderExecutionService;
 import com.bottrading.service.StrategyService;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.health.HealthService;
 import com.bottrading.service.risk.RiskGuard;
@@ -73,6 +74,7 @@ public class TradingScheduler {
   private final Throttle throttle;
   private final ChaosSuite chaosSuite;
   private final CandleSanitizer candleSanitizer;
+  private final AnomalyDetector anomalyDetector;
 
   private final Lock executionLock = new ReentrantLock();
   private final AtomicBoolean enabled = new AtomicBoolean(true);
@@ -96,6 +98,7 @@ public class TradingScheduler {
       ObjectProvider<Clock> clockProvider,
       Throttle throttle,
       ChaosSuite chaosSuite,
+      AnomalyDetector anomalyDetector,
       CandleSanitizer candleSanitizer) {
     this.tradingProps = tradingProps;
     this.strategyService = strategyService;
@@ -113,6 +116,7 @@ public class TradingScheduler {
     this.throttle = Objects.requireNonNull(throttle, "throttle");
     this.chaosSuite = Objects.requireNonNull(chaosSuite, "chaosSuite");
     this.candleSanitizer = Objects.requireNonNull(candleSanitizer, "candleSanitizer");
+    this.anomalyDetector = Objects.requireNonNull(anomalyDetector, "anomalyDetector");
     this.decisionTimer =
         Timer.builder("scheduler.candle.duration.ms")
             .publishPercentileHistogram()
@@ -384,6 +388,7 @@ public class TradingScheduler {
       return GateResult.blocked(allocation.reason(), 0);
     }
     double finalMultiplier = allocation.sizingMultiplier() * driftWatchdog.sizingMultiplier();
+    finalMultiplier *= anomalyDetector.sizingMultiplier(context.symbol());
     if (finalMultiplier <= 0) {
       return GateResult.blocked("SIZING_ZERO", 0);
     }

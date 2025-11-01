@@ -136,3 +136,38 @@ body {
 #banditPanel .card-header span.text-muted {
   font-size: 0.75rem;
 }
+
+.anomaly-banner {
+  background: #fff7ed;
+  border-radius: 0.75rem;
+  border: 1px solid #fed7aa;
+}
+
+.anomaly-badge {
+  font-size: 0.75rem;
+  background-color: #fb923c;
+  color: #1f2937;
+}
+
+.anomaly-badge.warn {
+  background-color: #facc15;
+}
+
+.anomaly-badge.medium {
+  background-color: #f97316;
+}
+
+.anomaly-badge.high {
+  background-color: #ef4444;
+  color: #fef2f2;
+}
+
+.anomaly-badge.severe {
+  background-color: #991b1b;
+  color: #fef2f2;
+}
+
+.sparkline-wrapper {
+  min-width: 160px;
+  max-width: 220px;
+}

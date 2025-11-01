@@ -10,6 +10,7 @@ import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.tca.TcaService;
 import com.bottrading.service.trading.OrderService;
@@ -49,6 +50,7 @@ public class ExecutionEngine {
   private final DistributionSummary queueTimes;
   private final ConcurrentMap<String, RunningAverage> slippageAvg = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AtomicReference<Double>> povGauge = new ConcurrentHashMap<>();
+  private final AnomalyDetector anomalyDetector;
 
   public ExecutionEngine(
       ExecutionPolicy policy,
@@ -57,7 +59,8 @@ public class ExecutionEngine {
       TcaService tcaService,
       ExecutionProperties properties,
       MeterRegistry meterRegistry,
-      Clock clock) {
+      Clock clock,
+      AnomalyDetector anomalyDetector) {
     this.policy = policy;
     this.orderService = orderService;
     this.binanceClient = binanceClient;
@@ -65,6 +68,7 @@ public class ExecutionEngine {
     this.properties = properties;
     this.meterRegistry = meterRegistry;
     this.clock = clock;
+    this.anomalyDetector = anomalyDetector;
     this.queueTimes =
         DistributionSummary.builder("exec.queueTime.ms").publishPercentileHistogram().register(meterRegistry);
   }
@@ -73,7 +77,16 @@ public class ExecutionEngine {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(snapshot, "snapshot");
 
+    anomalyDetector.recordSpread(request.symbol(), request.spreadBps());
     OrderPlan plan = policy.planFor(request, snapshot, tcaService::expectedSlippageBps);
+    AnomalyDetector.ExecutionOverride override = anomalyDetector.executionOverride(request.symbol());
+    if (override == AnomalyDetector.ExecutionOverride.FORCE_MARKET) {
+      plan = new MarketPlan();
+    } else if (override == AnomalyDetector.ExecutionOverride.FORCE_TWAP) {
+      int slices = Math.max(2, properties.getTwap().getSlices());
+      Duration window = properties.getTwap().windowDuration();
+      plan = new TwapPlan(slices, window);
+    }
     if (plan instanceof MarketPlan marketPlan) {
       return executeMarket(request, snapshot, marketPlan);
     } else if (plan instanceof LimitPlan limitPlan) {
@@ -263,6 +276,7 @@ public class ExecutionEngine {
             ? 0
             : Duration.between(submittedAt, response.transactTime()).toMillis();
     queueTimes.record(queue);
+    anomalyDetector.recordQueueTime(request.symbol(), queue);
     BigDecimal fillPrice = resolveFillPrice(response, price);
     tcaService.recordFill(
         response.clientOrderId(), response.orderId(), fillPrice, BigDecimal.valueOf(request.spreadBps()), response.transactTime());
@@ -290,6 +304,7 @@ public class ExecutionEngine {
                     .doubleValue() * (request.side() == OrderSide.BUY ? 1 : -1);
     if (!Double.isNaN(slippage)) {
       updateSlippageGauge(request.symbol(), slippage);
+      anomalyDetector.recordSlippage(request.symbol(), slippage);
     }
   }
 
