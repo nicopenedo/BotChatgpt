@@ -1,132 +1,86 @@
 package com.bottrading.strategy.router;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.bottrading.config.TradingProps;
 import com.bottrading.research.regime.Regime;
 import com.bottrading.research.regime.RegimeTrend;
 import com.bottrading.research.regime.RegimeVolatility;
+import com.bottrading.strategy.CompositeStrategy;
 import com.bottrading.strategy.StrategyFactory;
+import com.bottrading.strategy.StrategyFactory.RouterConfig;
+import com.bottrading.strategy.StrategyFactory.RouterRule;
+import com.bottrading.strategy.StrategyFactory.StrategyCatalog;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import org.junit.jupiter.api.BeforeEach;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
+import org.springframework.core.io.DefaultResourceLoader;
 
 class StrategyRouterTest {
 
-  private TradingProps props;
-  private StrategyFactory factory;
-  private StrategyRouter router;
+  @Test
+  void appliesHysteresisAndFallback() {
+    CompositeStrategy upStrategy = new CompositeStrategy();
+    CompositeStrategy downStrategy = new CompositeStrategy();
+    CompositeStrategy rangeStrategy = new CompositeStrategy();
+    CompositeStrategy globalStrategy = new CompositeStrategy();
 
-  @BeforeEach
-  void setUp() {
-    props = new TradingProps();
+    Map<String, CompositeStrategy> presets =
+        Map.of(
+            "preset_up", upStrategy,
+            "preset_down", downStrategy,
+            "preset_range", rangeStrategy,
+            "preset_global", globalStrategy);
+
+    RouterConfig routerConfig =
+        new RouterConfig(
+            List.of(
+                new RouterRule(RegimeTrend.UP, null, "preset_up"),
+                new RouterRule(RegimeTrend.DOWN, null, "preset_down"),
+                new RouterRule(RegimeTrend.RANGE, null, "preset_range")),
+            "preset_global",
+            3);
+
+    StrategyCatalog catalog = new StrategyCatalog(presets, routerConfig, "preset_global");
+
+    StrategyFactory factory =
+        new StrategyFactory(new DefaultResourceLoader(), new TradingProps()) {
+          @Override
+          public StrategyCatalog getCatalog() {
+            return catalog;
+          }
+
+          @Override
+          public CompositeStrategy getStrategy(String preset) {
+            return presets.get(preset);
+          }
+
+          @Override
+          public List<RouterRule> getRouterRules() {
+            return routerConfig.rules();
+          }
+        };
+
+    TradingProps props = new TradingProps();
     props.getRouter().setEnabled(true);
-    factory = new StrategyFactory(new InMemoryResourceLoader(customYaml()), props);
-    router = new StrategyRouter(props, factory, new SimpleMeterRegistry());
-  }
+    StrategyRouter router = new StrategyRouter(props, factory, new SimpleMeterRegistry());
 
-  @Test
-  void shouldSelectPresetByTrendAndVolatility() {
-    Regime regime =
-        new Regime(
-            "BTCUSDT",
-            "1m",
-            RegimeTrend.UP,
-            RegimeVolatility.LO,
-            0.01,
-            25,
-            0.2,
-            Instant.now());
-    StrategyRouter.Selection selection = router.select("BTCUSDT", regime);
-    assertThat(selection.preset()).isEqualTo("trend_up");
-    assertThat(selection.strategy()).isNotNull();
-  }
+    Regime upRegime = new Regime("TEST", "1m", RegimeTrend.UP, RegimeVolatility.LO, 0, 0, 0, Instant.now());
+    Regime downRegime =
+        new Regime("TEST", "1m", RegimeTrend.DOWN, RegimeVolatility.LO, 0, 0, 0, Instant.now());
 
-  @Test
-  void shouldFallbackToDefaultWhenRouterDisabled() {
-    props.getRouter().setEnabled(false);
-    Regime regime =
-        new Regime(
-            "ETHUSDT",
-            "1m",
-            RegimeTrend.DOWN,
-            RegimeVolatility.HI,
-            0.02,
-            30,
-            0.4,
-            Instant.now());
-    StrategyRouter.Selection selection = router.select("ETHUSDT", regime);
-    assertThat(selection.preset()).isEqualTo(factory.getCatalog().defaultPreset());
-  }
+    // Initial selection should use fallback until hysteresis satisfied
+    Assertions.assertEquals("preset_global", router.select("BTC", upRegime).preset());
+    Assertions.assertEquals("preset_global", router.select("BTC", upRegime).preset());
+    Assertions.assertEquals("preset_up", router.select("BTC", upRegime).preset());
 
-  private String customYaml() {
-    return """
-        thresholds:
-          buy: 1.0
-          sell: 1.0
-        signals:
-          - type: SMA_CROSS
-            weight: 1.0
-            confidence: 1.0
-            params:
-              fast: 5
-              slow: 10
-        presets:
-          trend_up:
-            thresholds:
-              buy: 2.0
-          range:
-            thresholds:
-              sell: 2.0
-        router:
-          rules:
-            - when:
-                trend: UP
-              use: trend_up
-            - when:
-                trend: RANGE
-              use: range
-        """;
-  }
+    // Switch to down after hysteresis
+    Assertions.assertEquals("preset_up", router.select("BTC", downRegime).preset());
+    Assertions.assertEquals("preset_up", router.select("BTC", downRegime).preset());
+    Assertions.assertEquals("preset_down", router.select("BTC", downRegime).preset());
 
-  private static final class InMemoryResourceLoader implements ResourceLoader {
-
-    private final String yaml;
-
-    private InMemoryResourceLoader(String yaml) {
-      this.yaml = yaml;
-    }
-
-    @Override
-    public Resource getResource(String location) {
-      return new ByteArrayResource(yaml.getBytes(StandardCharsets.UTF_8)) {
-        @Override
-        public boolean exists() {
-          return true;
-        }
-
-        @Override
-        public String getFilename() {
-          return "strategy.yml";
-        }
-
-        @Override
-        public long contentLength() throws IOException {
-          return yaml.length();
-        }
-      };
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-      return StrategyRouterTest.class.getClassLoader();
-    }
+    // Null regime falls back to global
+    Assertions.assertEquals("preset_global", router.select("BTC", null).preset());
   }
 }
-

@@ -20,12 +20,22 @@ public class Evaluator {
   private final BacktestRequest request;
   private final int maxWorkers;
   private final Path reportsDir;
+  private final double complexityPenalty;
+  private final int minTrades;
 
-  public Evaluator(BacktestEngine engine, BacktestRequest request, int maxWorkers, Path reportsDir) {
+  public Evaluator(
+      BacktestEngine engine,
+      BacktestRequest request,
+      int maxWorkers,
+      Path reportsDir,
+      double complexityPenalty,
+      int minTrades) {
     this.engine = engine;
     this.request = request;
     this.maxWorkers = Math.max(1, maxWorkers);
     this.reportsDir = reportsDir;
+    this.complexityPenalty = Math.max(0, complexityPenalty);
+    this.minTrades = Math.max(0, minTrades);
   }
 
   public void evaluate(List<Genome> genomes) throws InterruptedException {
@@ -37,8 +47,9 @@ public class Evaluator {
               () -> {
                 try {
                   BacktestResult result = engine.run(request, null, genome.toStrategy());
-                  genome.metrics(result.metrics());
-                  genome.fitness(score(result.metrics()));
+                  MetricsSummary metrics = result.metrics();
+                  genome.metrics(metrics);
+                  genome.fitness(applyPenalties(genome, metrics));
                 } catch (IOException ex) {
                   genome.fitness(Double.NEGATIVE_INFINITY);
                 }
@@ -53,6 +64,18 @@ public class Evaluator {
     }
     executor.shutdown();
     executor.awaitTermination(1, TimeUnit.HOURS);
+  }
+
+  private double applyPenalties(Genome genome, MetricsSummary metrics) {
+    if (metrics == null) {
+      return Double.NEGATIVE_INFINITY;
+    }
+    if (metrics.trades() < minTrades) {
+      return Double.NEGATIVE_INFINITY;
+    }
+    double base = score(metrics);
+    double penalty = complexityPenalty * genome.activeSignals();
+    return base - penalty;
   }
 
   private double score(MetricsSummary metrics) {

@@ -59,7 +59,8 @@ class BacktestEngineTest {
             false,
             null,
             "test",
-            false);
+            false,
+            null);
     BacktestResult result = engine.run(request, null, strategy);
 
     Assertions.assertEquals(1, result.trades().size());
