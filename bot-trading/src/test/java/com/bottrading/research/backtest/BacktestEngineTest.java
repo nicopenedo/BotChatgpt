@@ -34,7 +34,7 @@ class BacktestEngineTest {
             return klines;
           }
         };
-    StrategyFactory factory = new StrategyFactory(new DefaultResourceLoader(), new com.bottrading.config.TradingProperties());
+    StrategyFactory factory = new StrategyFactory(new DefaultResourceLoader(), new com.bottrading.config.TradingProps());
     ReportWriter reportWriter =
         new ReportWriter(
             new com.bottrading.research.io.CsvWriter(),
@@ -69,7 +69,8 @@ class BacktestEngineTest {
 
   private Kline kline(long offset, double close) {
     BigDecimal price = BigDecimal.valueOf(close);
-    return new Kline(Instant.ofEpochMilli(offset), price, price, price, price, BigDecimal.ONE);
+    Instant open = Instant.ofEpochMilli(offset);
+    return new Kline(open, open.plusSeconds(60), price, price, price, price, BigDecimal.ONE);
   }
 
   private static class TestSignal implements Signal {

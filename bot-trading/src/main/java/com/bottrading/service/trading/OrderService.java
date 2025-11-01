@@ -1,6 +1,6 @@
 package com.bottrading.service.trading;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.bottrading.model.dto.AccountBalancesResponse;
 import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
@@ -27,7 +27,7 @@ public class OrderService {
   private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
   private final BinanceClient binanceClient;
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProperties;
   private final TradingState tradingState;
   private final RiskGuard riskGuard;
   private final OrderRepository orderRepository;
@@ -36,7 +36,7 @@ public class OrderService {
 
   public OrderService(
       BinanceClient binanceClient,
-      TradingProperties tradingProperties,
+      TradingProps tradingProperties,
       TradingState tradingState,
       RiskGuard riskGuard,
       OrderRepository orderRepository,
@@ -101,10 +101,12 @@ public class OrderService {
 
   private OrderResponse simulateOrder(OrderRequest request) {
     String orderId = "SIM-" + System.currentTimeMillis();
+    String clientOrderId =
+        request.getClientOrderId() != null ? request.getClientOrderId() : IdGenerator.newClientOrderId();
     OrderResponse response =
         new OrderResponse(
             orderId,
-            IdGenerator.newClientOrderId(),
+            clientOrderId,
             request.getSymbol(),
             request.getSide(),
             request.getType(),

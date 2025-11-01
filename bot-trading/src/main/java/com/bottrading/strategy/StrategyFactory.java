@@ -1,6 +1,6 @@
 package com.bottrading.strategy;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.bottrading.strategy.signals.AdxFilter;
 import com.bottrading.strategy.signals.AtrVolatilityFilter;
 import com.bottrading.strategy.signals.BollingerBandsSignal;
@@ -34,13 +34,13 @@ public class StrategyFactory {
   private static final Logger log = LoggerFactory.getLogger(StrategyFactory.class);
 
   private final ResourceLoader resourceLoader;
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProps;
   private volatile CompositeStrategy cachedStrategy;
 
   public StrategyFactory(
-      ResourceLoader resourceLoader, TradingProperties tradingProperties) {
+      ResourceLoader resourceLoader, TradingProps tradingProps) {
     this.resourceLoader = resourceLoader;
-    this.tradingProperties = tradingProperties;
+    this.tradingProps = tradingProps;
     this.cachedStrategy = loadFromYaml().orElseGet(this::fromDefaults);
   }
 
@@ -119,7 +119,7 @@ public class StrategyFactory {
   private CompositeStrategy fromDefaults() {
     CompositeStrategy strategy = new CompositeStrategy();
     strategy.thresholds(1.5, 1.5);
-    strategy.addFilter(new Volume24hFilter(tradingProperties.getMinVolume24h().doubleValue()));
+    strategy.addFilter(new Volume24hFilter(tradingProps.getMinVolume24h().doubleValue()));
     strategy.addFilter(new AtrVolatilityFilter(14, 5));
     strategy.addSignal(new SmaCrossoverSignal(9, 21, 0.8), 1.0);
     strategy.addSignal(new MacdSignal(12, 26, 9, 0.7), 1.0);
@@ -232,8 +232,8 @@ public class StrategyFactory {
       case "VOLUME24H_FILTER" ->
           new Volume24hFilter(
               params != null && params.containsKey("minVolume")
-                  ? readDouble(params.get("minVolume"), tradingProperties.getMinVolume24h().doubleValue())
-                  : tradingProperties.getMinVolume24h().doubleValue());
+                  ? readDouble(params.get("minVolume"), tradingProps.getMinVolume24h().doubleValue())
+                  : tradingProps.getMinVolume24h().doubleValue());
       default -> {
         log.warn("Unknown signal type {}", type);
         yield null;

@@ -78,6 +78,7 @@ public class BinanceClientImpl implements BinanceClient {
       klines.add(
           new Kline(
               Instant.ofEpochMilli(kline.get(0).asLong()),
+              Instant.ofEpochMilli(kline.get(6).asLong()),
               new BigDecimal(kline.get(1).asText()),
               new BigDecimal(kline.get(2).asText()),
               new BigDecimal(kline.get(3).asText()),
@@ -168,7 +169,9 @@ public class BinanceClientImpl implements BinanceClient {
     params.put("symbol", request.getSymbol());
     params.put("side", request.getSide().name());
     params.put("type", request.getType().name());
-    params.put("newClientOrderId", IdGenerator.newClientOrderId());
+    String clientOrderId =
+        request.getClientOrderId() != null ? request.getClientOrderId() : IdGenerator.newClientOrderId();
+    params.put("newClientOrderId", clientOrderId);
     if (request.getType() == OrderType.LIMIT) {
       params.put("price", request.getPrice().toPlainString());
       params.put("quantity", request.getQuantity().toPlainString());

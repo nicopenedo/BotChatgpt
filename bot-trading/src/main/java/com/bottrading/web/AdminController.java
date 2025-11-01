@@ -1,6 +1,6 @@
 package com.bottrading.web;
 
-import com.bottrading.config.TradingProperties;
+import com.bottrading.config.TradingProps;
 import com.bottrading.service.risk.TradingState;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
   private final TradingState tradingState;
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProperties;
 
-  public AdminController(TradingState tradingState, TradingProperties tradingProperties) {
+  public AdminController(TradingState tradingState, TradingProps tradingProperties) {
     this.tradingState = tradingState;
     this.tradingProperties = tradingProperties;
   }

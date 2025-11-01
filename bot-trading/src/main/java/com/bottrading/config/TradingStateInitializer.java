@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 public class TradingStateInitializer {
 
   private final TradingState tradingState;
-  private final TradingProperties tradingProperties;
+  private final TradingProps tradingProperties;
 
-  public TradingStateInitializer(TradingState tradingState, TradingProperties tradingProperties) {
+  public TradingStateInitializer(TradingState tradingState, TradingProps tradingProperties) {
     this.tradingState = tradingState;
     this.tradingProperties = tradingProperties;
   }
