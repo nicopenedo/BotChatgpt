@@ -27,7 +27,8 @@ public class OrderSizingService {
       BigDecimal stopPrice,
       BigDecimal atr,
       BigDecimal equity,
-      ExchangeInfo exchangeInfo) {
+      ExchangeInfo exchangeInfo,
+      double sizingMultiplier) {
     Objects.requireNonNull(side, "side");
     Objects.requireNonNull(entryPrice, "entryPrice");
     Objects.requireNonNull(stopPrice, "stopPrice");
@@ -48,7 +49,9 @@ public class OrderSizingService {
 
     BigDecimal riskFraction =
         tradingProps.getRiskPerTradePct().divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
-    BigDecimal riskAmount = equity.multiply(riskFraction);
+    BigDecimal multiplier =
+        BigDecimal.valueOf(Math.max(0.0, Math.min(1.0, sizingMultiplier))).setScale(8, RoundingMode.HALF_UP);
+    BigDecimal riskAmount = equity.multiply(riskFraction).multiply(multiplier);
     if (riskAmount.compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalStateException("Risk amount must be positive");
     }

@@ -1,6 +1,8 @@
 package com.bottrading.strategy;
 
 import com.bottrading.config.TradingProps;
+import com.bottrading.research.regime.RegimeTrend;
+import com.bottrading.research.regime.RegimeVolatility;
 import com.bottrading.strategy.signals.AdxFilter;
 import com.bottrading.strategy.signals.AtrVolatilityFilter;
 import com.bottrading.strategy.signals.BollingerBandsSignal;
@@ -18,6 +20,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,27 +39,56 @@ public class StrategyFactory {
 
   private final ResourceLoader resourceLoader;
   private final TradingProps tradingProps;
-  private volatile CompositeStrategy cachedStrategy;
+  private volatile StrategyCatalog catalog;
 
   public StrategyFactory(
       ResourceLoader resourceLoader, TradingProps tradingProps) {
     this.resourceLoader = resourceLoader;
     this.tradingProps = tradingProps;
-    this.cachedStrategy = loadFromYaml().orElseGet(this::fromDefaults);
+    this.catalog = loadFromYaml().orElseGet(this::fromDefaults);
   }
 
   public CompositeStrategy getStrategy() {
-    if (cachedStrategy == null) {
-      cachedStrategy = fromDefaults();
+    StrategyCatalog current = catalog;
+    if (current == null) {
+      current = fromDefaults();
+      catalog = current;
     }
-    return cachedStrategy;
+    return current.strategy(current.defaultPreset());
+  }
+
+  public CompositeStrategy getStrategy(String preset) {
+    StrategyCatalog current = catalog;
+    if (current == null) {
+      current = fromDefaults();
+      catalog = current;
+    }
+    return current.strategy(preset);
+  }
+
+  public List<RouterRule> getRouterRules() {
+    StrategyCatalog current = catalog;
+    if (current == null) {
+      current = fromDefaults();
+      catalog = current;
+    }
+    return current.routerRules();
+  }
+
+  public StrategyCatalog getCatalog() {
+    StrategyCatalog current = catalog;
+    if (current == null) {
+      current = fromDefaults();
+      catalog = current;
+    }
+    return current;
   }
 
   public synchronized void reload() {
-    cachedStrategy = loadFromYaml().orElseGet(this::fromDefaults);
+    catalog = loadFromYaml().orElseGet(this::fromDefaults);
   }
 
-  private Optional<CompositeStrategy> loadFromYaml() {
+  private Optional<StrategyCatalog> loadFromYaml() {
     Resource resource = resourceLoader.getResource("classpath:strategy.yml");
     if (!resource.exists()) {
       log.warn("strategy.yml not found on classpath; using defaults");
@@ -71,7 +104,7 @@ public class StrategyFactory {
     }
   }
 
-  public Optional<CompositeStrategy> buildFromPath(Path path) {
+  public Optional<StrategyCatalog> buildFromPath(Path path) {
     try (InputStream input = Files.newInputStream(path)) {
       Yaml yaml = new Yaml();
       Object loaded = yaml.load(input);
@@ -82,41 +115,42 @@ public class StrategyFactory {
     }
   }
 
-  private Optional<CompositeStrategy> buildFromRoot(Object loaded) {
+  private Optional<StrategyCatalog> buildFromRoot(Object loaded) {
     if (!(loaded instanceof Map<?, ?> rootMap)) {
       log.warn("Strategy configuration empty or invalid, falling back to defaults");
       return Optional.empty();
     }
-    CompositeStrategy strategy = new CompositeStrategy();
-    Map<String, Object> thresholds = castMap(rootMap.get("thresholds"));
-    double buyThreshold = thresholds != null ? readDouble(thresholds.get("buy"), 1.0) : 1.0;
-    double sellThreshold = thresholds != null ? readDouble(thresholds.get("sell"), 1.0) : 1.0;
-    strategy.thresholds(buyThreshold, sellThreshold);
+    Map<String, Object> baseSections = extractBaseSections(rootMap);
+    CompositeStrategy defaultStrategy = buildComposite(baseSections);
 
-    List<Map<String, Object>> filters = castList(rootMap.get("filters"));
-    if (filters != null) {
-      for (Map<String, Object> filterConfig : filters) {
-        Signal filter = buildSignal(filterConfig);
-        if (filter != null) {
-          strategy.addFilter(filter);
+    Map<String, CompositeStrategy> presets = new HashMap<>();
+    presets.put("default", defaultStrategy);
+
+    Map<String, Object> presetConfigs = castMap(rootMap.get("presets"));
+    if (presetConfigs != null) {
+      for (Map.Entry<String, Object> entry : presetConfigs.entrySet()) {
+        Map<String, Object> presetMap = castMap(entry.getValue());
+        Map<String, Object> merged = new HashMap<>(baseSections);
+        if (presetMap != null) {
+          if (presetMap.containsKey("thresholds")) {
+            merged.put("thresholds", presetMap.get("thresholds"));
+          }
+          if (presetMap.containsKey("filters")) {
+            merged.put("filters", presetMap.get("filters"));
+          }
+          if (presetMap.containsKey("signals")) {
+            merged.put("signals", presetMap.get("signals"));
+          }
         }
+        presets.put(entry.getKey(), buildComposite(merged));
       }
     }
 
-    List<Map<String, Object>> signals = castList(rootMap.get("signals"));
-    if (signals != null) {
-      for (Map<String, Object> signalConfig : signals) {
-        Signal signal = buildSignal(signalConfig);
-        if (signal != null) {
-          double weight = readDouble(signalConfig.getOrDefault("weight", 1.0), 1.0);
-          strategy.addSignal(signal, weight);
-        }
-      }
-    }
-    return Optional.of(strategy);
+    List<RouterRule> rules = parseRouterRules(rootMap.get("router"));
+    return Optional.of(new StrategyCatalog(presets, rules, "default"));
   }
 
-  private CompositeStrategy fromDefaults() {
+  private StrategyCatalog fromDefaults() {
     CompositeStrategy strategy = new CompositeStrategy();
     strategy.thresholds(1.5, 1.5);
     strategy.addFilter(new Volume24hFilter(tradingProps.getMinVolume24h().doubleValue()));
@@ -125,7 +159,8 @@ public class StrategyFactory {
     strategy.addSignal(new MacdSignal(12, 26, 9, 0.7), 1.0);
     strategy.addSignal(new RsiSignal(14, 30, 70, 50, 0.6), 0.8);
     strategy.addSignal(new BollingerBandsSignal(20, 2.0, 0.5), 0.6);
-    return strategy;
+    Map<String, CompositeStrategy> presets = Map.of("default", strategy);
+    return new StrategyCatalog(presets, List.of(), "default");
   }
 
   @SuppressWarnings("unchecked")
@@ -239,5 +274,128 @@ public class StrategyFactory {
         yield null;
       }
     };
+  }
+
+  private Map<String, Object> extractBaseSections(Map<String, Object> rootMap) {
+    Map<String, Object> base = new HashMap<>();
+    if (rootMap.containsKey("thresholds")) {
+      base.put("thresholds", rootMap.get("thresholds"));
+    }
+    if (rootMap.containsKey("filters")) {
+      base.put("filters", rootMap.get("filters"));
+    }
+    if (rootMap.containsKey("signals")) {
+      base.put("signals", rootMap.get("signals"));
+    }
+    return base;
+  }
+
+  private CompositeStrategy buildComposite(Map<String, Object> sections) {
+    CompositeStrategy strategy = new CompositeStrategy();
+    Map<String, Object> thresholds = castMap(sections.get("thresholds"));
+    double buyThreshold = thresholds != null ? readDouble(thresholds.get("buy"), 1.0) : 1.0;
+    double sellThreshold = thresholds != null ? readDouble(thresholds.get("sell"), 1.0) : 1.0;
+    strategy.thresholds(buyThreshold, sellThreshold);
+
+    List<Map<String, Object>> filters = castList(sections.get("filters"));
+    if (filters != null) {
+      for (Map<String, Object> filterConfig : filters) {
+        Signal filter = buildSignal(filterConfig);
+        if (filter != null) {
+          strategy.addFilter(filter);
+        }
+      }
+    }
+
+    List<Map<String, Object>> signals = castList(sections.get("signals"));
+    if (signals != null) {
+      for (Map<String, Object> signalConfig : signals) {
+        Signal signal = buildSignal(signalConfig);
+        if (signal != null) {
+          double weight = readDouble(signalConfig.getOrDefault("weight", 1.0), 1.0);
+          strategy.addSignal(signal, weight);
+        }
+      }
+    }
+    return strategy;
+  }
+
+  private List<RouterRule> parseRouterRules(Object routerConfig) {
+    Map<String, Object> router = castMap(routerConfig);
+    if (router == null) {
+      return List.of();
+    }
+    List<Map<String, Object>> rulesConfig = castList(router.get("rules"));
+    if (rulesConfig == null) {
+      return List.of();
+    }
+    List<RouterRule> rules = new ArrayList<>();
+    for (Map<String, Object> ruleConfig : rulesConfig) {
+      Map<String, Object> when = castMap(ruleConfig.get("when"));
+      String preset = Optional.ofNullable(ruleConfig.get("use")).map(Object::toString).orElse("default");
+      RegimeTrend trend = null;
+      RegimeVolatility vol = null;
+      if (when != null) {
+        trend = parseTrend(when.get("trend"));
+        vol = parseVolatility(when.get("vol"));
+      }
+      rules.add(new RouterRule(trend, vol, preset));
+    }
+    return List.copyOf(rules);
+  }
+
+  private RegimeTrend parseTrend(Object value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return RegimeTrend.valueOf(value.toString().toUpperCase());
+    } catch (IllegalArgumentException ex) {
+      log.warn("Unknown trend regime {}", value);
+      return null;
+    }
+  }
+
+  private RegimeVolatility parseVolatility(Object value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return RegimeVolatility.valueOf(value.toString().toUpperCase());
+    } catch (IllegalArgumentException ex) {
+      log.warn("Unknown volatility regime {}", value);
+      return null;
+    }
+  }
+
+  public record RouterRule(RegimeTrend trend, RegimeVolatility volatility, String preset) {}
+
+  public static final class StrategyCatalog {
+    private final Map<String, CompositeStrategy> presets;
+    private final List<RouterRule> routerRules;
+    private final String defaultPreset;
+
+    public StrategyCatalog(
+        Map<String, CompositeStrategy> presets, List<RouterRule> routerRules, String defaultPreset) {
+      this.presets = Map.copyOf(presets);
+      this.routerRules = List.copyOf(routerRules);
+      this.defaultPreset = defaultPreset;
+    }
+
+    public CompositeStrategy strategy(String preset) {
+      return presets.getOrDefault(preset, presets.getOrDefault(defaultPreset, presets.values().stream().findFirst().orElse(null)));
+    }
+
+    public Map<String, CompositeStrategy> presets() {
+      return presets;
+    }
+
+    public List<RouterRule> routerRules() {
+      return routerRules;
+    }
+
+    public String defaultPreset() {
+      return defaultPreset;
+    }
   }
 }

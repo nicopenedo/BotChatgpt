@@ -17,11 +17,15 @@ import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
+import com.bottrading.strategy.StrategyDecision;
+import com.bottrading.strategy.StrategyContext;
+import com.bottrading.service.tca.TcaService;
 import com.bottrading.util.OrderValidator;
 import com.bottrading.shadow.ShadowEngine;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -44,6 +48,7 @@ public class OrderExecutionService {
   private final StopEngine stopEngine;
   private final PositionManager positionManager;
   private final ShadowEngine shadowEngine;
+  private final TcaService tcaService;
 
   public OrderExecutionService(
       TradingProps tradingProps,
@@ -54,7 +59,8 @@ public class OrderExecutionService {
       OrderSizingService orderSizingService,
       StopEngine stopEngine,
       PositionManager positionManager,
-      ShadowEngine shadowEngine) {
+      ShadowEngine shadowEngine,
+      TcaService tcaService) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
     this.orderService = orderService;
@@ -64,18 +70,33 @@ public class OrderExecutionService {
     this.stopEngine = stopEngine;
     this.positionManager = positionManager;
     this.shadowEngine = shadowEngine;
+    this.tcaService = tcaService;
   }
 
-  public Optional<OrderResponse> execute(String decisionKey, SignalResult decision, long closeTime) {
-    if (decision.side() == SignalSide.FLAT) {
+  public Optional<OrderResponse> execute(
+      String decisionKey,
+      String symbol,
+      String interval,
+      StrategyDecision decision,
+      long closeTime,
+      double sizingMultiplier) {
+    SignalResult signal = decision.signal();
+    if (signal.side() == SignalSide.FLAT) {
       log.debug("Decision {} is flat, no order to execute", decisionKey);
       return Optional.empty();
     }
 
-    String symbol = tradingProps.getSymbol();
     ExchangeInfo exchangeInfo = binanceClient.getExchangeInfo(symbol);
     PriceTicker priceTicker = binanceClient.getPrice(symbol);
-    BigDecimal lastPrice = priceTicker.price();
+    StrategyContext context = decision.context();
+    BigDecimal lastPrice =
+        context.lastPrice() != null ? context.lastPrice() : priceTicker.price();
+    BigDecimal volume24h = context.volume24h();
+    Double normalizedAtr = context.normalizedAtr();
+    BigDecimal atr =
+        normalizedAtr == null || lastPrice == null
+            ? null
+            : BigDecimal.valueOf(normalizedAtr).multiply(lastPrice);
 
     Assets assets = resolveAssets(symbol);
     AccountBalancesResponse balances =
@@ -86,22 +107,29 @@ public class OrderExecutionService {
     BigDecimal equity = quoteBalance.add(baseBalance.multiply(lastPrice));
     riskGuard.onEquityUpdate(equity);
 
-    OrderSide orderSide = decision.side() == SignalSide.BUY ? OrderSide.BUY : OrderSide.SELL;
-    StopPlan stopPlan = stopEngine.plan(symbol, orderSide, lastPrice, null);
+    OrderSide orderSide = signal.side() == SignalSide.BUY ? OrderSide.BUY : OrderSide.SELL;
+    StopPlan stopPlan = stopEngine.plan(symbol, orderSide, lastPrice, atr);
     OrderSizingResult sizingResult;
     try {
       sizingResult =
-          orderSizingService.size(orderSide, lastPrice, stopPlan.stopLoss(), null, equity, exchangeInfo);
+          orderSizingService.size(
+              orderSide, lastPrice, stopPlan.stopLoss(), atr, equity, exchangeInfo, sizingMultiplier);
     } catch (IllegalStateException | IllegalArgumentException ex) {
       log.warn("Sizing failed for {}: {}", decisionKey, ex.getMessage());
       return Optional.empty();
     }
     OrderRequest request = new OrderRequest();
     request.setSymbol(symbol);
-    request.setType(sizingResult.orderType());
     request.setSide(orderSide);
     request.setDryRun(tradingProps.isDryRun());
-    request.setClientOrderId(newClientOrderId(symbol, tradingProps.getInterval(), closeTime));
+    request.setClientOrderId(newClientOrderId(symbol, interval, closeTime));
+
+    OrderType orderType =
+        tcaService.recommendOrderType(symbol, sizingResult.orderType(), Instant.now());
+    request.setType(orderType);
+    if (orderType == OrderType.LIMIT) {
+      request.setPrice(lastPrice);
+    }
 
     if (orderSide == OrderSide.BUY) {
       BigDecimal quantity = sizingResult.quantity();
@@ -130,6 +158,8 @@ public class OrderExecutionService {
     }
 
     try {
+      tcaService.recordSubmission(
+          request.getClientOrderId(), symbol, orderSide, orderType, lastPrice, volume24h, atr, Instant.now());
       OrderResponse response = orderService.placeOrder(request);
       log.info(
           "Order {} executed: side={} qty={} quote={} status={} dryRun={}",
@@ -139,6 +169,9 @@ public class OrderExecutionService {
           request.getQuoteAmount(),
           response.status(),
           request.isDryRun());
+      if (response.executedQty() != null && response.executedQty().compareTo(BigDecimal.ZERO) > 0) {
+        tcaService.recordFill(response.clientOrderId(), response.price(), null, response.transactTime());
+      }
       if (!request.isDryRun()) {
         positionManager.openPosition(
             new PositionManager.OpenPositionCommand(

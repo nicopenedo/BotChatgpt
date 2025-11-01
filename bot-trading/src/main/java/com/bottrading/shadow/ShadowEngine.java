@@ -10,6 +10,7 @@ import com.bottrading.repository.ShadowPositionRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import com.bottrading.service.risk.drift.DriftWatchdog;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -30,17 +31,20 @@ public class ShadowEngine {
   private final Counter divergenceAlerts;
   private final ConcurrentMap<String, BigDecimal> livePnl = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, BigDecimal> shadowPnl = new ConcurrentHashMap<>();
+  private final DriftWatchdog driftWatchdog;
 
   public ShadowEngine(
       ShadowProperties properties,
       ShadowPositionRepository repository,
       TelegramNotifier notifier,
       MeterRegistry meterRegistry,
-      Optional<Clock> clock) {
+      Optional<Clock> clock,
+      DriftWatchdog driftWatchdog) {
     this.properties = properties;
     this.repository = repository;
     this.notifier = notifier;
     this.clock = clock.orElse(Clock.systemUTC());
+    this.driftWatchdog = driftWatchdog;
     this.divergenceAlerts = meterRegistry.counter("shadow.divergence.alerts");
     Gauge.builder("shadow.pnl.live", () -> livePnl.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).doubleValue())
         .register(meterRegistry);
@@ -111,6 +115,7 @@ public class ShadowEngine {
   public void registerShadowFill(String symbol, BigDecimal pnl) {
     shadowPnl.merge(symbol, pnl, BigDecimal::add);
     evaluateDivergence(symbol);
+    driftWatchdog.recordShadowTrade(symbol, pnl.doubleValue());
   }
 
   private void closeShadow(ShadowPositionEntity position, BigDecimal exitPrice) {

@@ -18,6 +18,7 @@ public class TradingProps {
   }
 
   private String symbol = "BTCUSDT";
+  private java.util.List<String> symbols = java.util.List.of("BTCUSDT");
   private String interval = "1m";
   private boolean liveEnabled = false;
   private BigDecimal maxDailyLossPct = BigDecimal.valueOf(2.0);
@@ -30,6 +31,11 @@ public class TradingProps {
   private String tradingHours = "00:00-23:59";
   private Mode mode = Mode.WEBSOCKET;
   private int jitterSeconds = 2;
+  private RouterProperties router = new RouterProperties();
+  private AllocatorProperties allocator = new AllocatorProperties();
+  private DriftProperties drift = new DriftProperties();
+  private HealthProperties health = new HealthProperties();
+  private TcaProperties tca = new TcaProperties();
 
   public String getSymbol() {
     return symbol;
@@ -37,6 +43,18 @@ public class TradingProps {
 
   public void setSymbol(String symbol) {
     this.symbol = symbol;
+  }
+
+  public java.util.List<String> getSymbols() {
+    return symbols;
+  }
+
+  public void setSymbols(java.util.List<String> symbols) {
+    if (symbols == null || symbols.isEmpty()) {
+      this.symbols = java.util.List.of(this.symbol);
+    } else {
+      this.symbols = java.util.List.copyOf(symbols);
+    }
   }
 
   public String getInterval() {
@@ -135,6 +153,46 @@ public class TradingProps {
     this.jitterSeconds = jitterSeconds;
   }
 
+  public RouterProperties getRouter() {
+    return router;
+  }
+
+  public void setRouter(RouterProperties router) {
+    this.router = router;
+  }
+
+  public AllocatorProperties getAllocator() {
+    return allocator;
+  }
+
+  public void setAllocator(AllocatorProperties allocator) {
+    this.allocator = allocator;
+  }
+
+  public DriftProperties getDrift() {
+    return drift;
+  }
+
+  public void setDrift(DriftProperties drift) {
+    this.drift = drift;
+  }
+
+  public HealthProperties getHealth() {
+    return health;
+  }
+
+  public void setHealth(HealthProperties health) {
+    this.health = health;
+  }
+
+  public TcaProperties getTca() {
+    return tca;
+  }
+
+  public void setTca(TcaProperties tca) {
+    this.tca = tca;
+  }
+
   public LocalTime getTradingWindowStart() {
     return parseTradingWindow()[0];
   }
@@ -154,6 +212,201 @@ public class TradingProps {
       return new LocalTime[] {start, end};
     } catch (DateTimeParseException ex) {
       return new LocalTime[] {LocalTime.MIN, LocalTime.MAX};
+    }
+  }
+
+  public static class RouterProperties {
+    private boolean enabled = true;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+  }
+
+  public static class AllocatorProperties {
+    private boolean enabled = true;
+    private int maxSimultaneous = 1;
+    private BigDecimal perSymbolMaxRiskPct = BigDecimal.valueOf(0.5);
+    private BigDecimal portfolioMaxTotalRiskPct = BigDecimal.ONE;
+    private int corrLookbackDays = 30;
+    private double corrMaxPairwise = 0.85;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public int getMaxSimultaneous() {
+      return maxSimultaneous;
+    }
+
+    public void setMaxSimultaneous(int maxSimultaneous) {
+      this.maxSimultaneous = maxSimultaneous;
+    }
+
+    public BigDecimal getPerSymbolMaxRiskPct() {
+      return perSymbolMaxRiskPct;
+    }
+
+    public void setPerSymbolMaxRiskPct(BigDecimal perSymbolMaxRiskPct) {
+      this.perSymbolMaxRiskPct = perSymbolMaxRiskPct;
+    }
+
+    public BigDecimal getPortfolioMaxTotalRiskPct() {
+      return portfolioMaxTotalRiskPct;
+    }
+
+    public void setPortfolioMaxTotalRiskPct(BigDecimal portfolioMaxTotalRiskPct) {
+      this.portfolioMaxTotalRiskPct = portfolioMaxTotalRiskPct;
+    }
+
+    public int getCorrLookbackDays() {
+      return corrLookbackDays;
+    }
+
+    public void setCorrLookbackDays(int corrLookbackDays) {
+      this.corrLookbackDays = corrLookbackDays;
+    }
+
+    public double getCorrMaxPairwise() {
+      return corrMaxPairwise;
+    }
+
+    public void setCorrMaxPairwise(double corrMaxPairwise) {
+      this.corrMaxPairwise = corrMaxPairwise;
+    }
+  }
+
+  public static class DriftProperties {
+    private boolean enabled = true;
+    private int windowTrades = 50;
+    private double thresholdPfDrop = 0.35;
+    private double thresholdMaxddPct = 8.0;
+    private boolean actionsAutoDowngrade = true;
+    private double expectedProfitFactor = 1.5;
+    private double expectedWinRate = 0.55;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public int getWindowTrades() {
+      return windowTrades;
+    }
+
+    public void setWindowTrades(int windowTrades) {
+      this.windowTrades = windowTrades;
+    }
+
+    public double getThresholdPfDrop() {
+      return thresholdPfDrop;
+    }
+
+    public void setThresholdPfDrop(double thresholdPfDrop) {
+      this.thresholdPfDrop = thresholdPfDrop;
+    }
+
+    public double getThresholdMaxddPct() {
+      return thresholdMaxddPct;
+    }
+
+    public void setThresholdMaxddPct(double thresholdMaxddPct) {
+      this.thresholdMaxddPct = thresholdMaxddPct;
+    }
+
+    public boolean isActionsAutoDowngrade() {
+      return actionsAutoDowngrade;
+    }
+
+    public void setActionsAutoDowngrade(boolean actionsAutoDowngrade) {
+      this.actionsAutoDowngrade = actionsAutoDowngrade;
+    }
+
+    public double getExpectedProfitFactor() {
+      return expectedProfitFactor;
+    }
+
+    public void setExpectedProfitFactor(double expectedProfitFactor) {
+      this.expectedProfitFactor = expectedProfitFactor;
+    }
+
+    public double getExpectedWinRate() {
+      return expectedWinRate;
+    }
+
+    public void setExpectedWinRate(double expectedWinRate) {
+      this.expectedWinRate = expectedWinRate;
+    }
+  }
+
+  public static class HealthProperties {
+    private boolean enabled = true;
+    private int wsMaxReconnectsPerHour = 6;
+    private double apiMaxErrorRatePct = 5.0;
+    private long apiLatencyThresholdMs = 500;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public int getWsMaxReconnectsPerHour() {
+      return wsMaxReconnectsPerHour;
+    }
+
+    public void setWsMaxReconnectsPerHour(int wsMaxReconnectsPerHour) {
+      this.wsMaxReconnectsPerHour = wsMaxReconnectsPerHour;
+    }
+
+    public double getApiMaxErrorRatePct() {
+      return apiMaxErrorRatePct;
+    }
+
+    public void setApiMaxErrorRatePct(double apiMaxErrorRatePct) {
+      this.apiMaxErrorRatePct = apiMaxErrorRatePct;
+    }
+
+    public long getApiLatencyThresholdMs() {
+      return apiLatencyThresholdMs;
+    }
+
+    public void setApiLatencyThresholdMs(long apiLatencyThresholdMs) {
+      this.apiLatencyThresholdMs = apiLatencyThresholdMs;
+    }
+  }
+
+  public static class TcaProperties {
+    private boolean enabled = true;
+    private int historySize = 5000;
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public int getHistorySize() {
+      return historySize;
+    }
+
+    public void setHistorySize(int historySize) {
+      this.historySize = historySize;
     }
   }
 }

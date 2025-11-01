@@ -1,5 +1,6 @@
 package com.bottrading.web.ui;
 
+import com.bottrading.config.TradingProps;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -14,6 +15,12 @@ public class DashboardController {
 
   private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
 
+  private final TradingProps tradingProps;
+
+  public DashboardController(TradingProps tradingProps) {
+    this.tradingProps = tradingProps;
+  }
+
   @GetMapping("/ui/dashboard")
   @PreAuthorize("hasRole('VIEWER')")
   public String dashboard(
@@ -22,10 +29,12 @@ public class DashboardController {
       @RequestParam(required = false) String from,
       @RequestParam(required = false) String to,
       Model model) {
-    model.addAttribute("symbols", List.of("BTCUSDT", "ETHUSDT", "BNBUSDT"));
+    List<String> symbols = tradingProps.getSymbols();
+    model.addAttribute("symbols", symbols);
     model.addAttribute("intervals", List.of("1m", "5m", "15m", "1h", "4h", "1d"));
-    model.addAttribute("defaultSymbol", symbol != null ? symbol : "BTCUSDT");
-    model.addAttribute("defaultInterval", interval != null ? interval : "1h");
+    String defaultSymbol = symbol != null ? symbol : (symbols.isEmpty() ? tradingProps.getSymbol() : symbols.get(0));
+    model.addAttribute("defaultSymbol", defaultSymbol);
+    model.addAttribute("defaultInterval", interval != null ? interval : tradingProps.getInterval());
     Instant now = Instant.now();
     model.addAttribute("defaultTo", to != null ? to : ISO.format(now));
     model.addAttribute(

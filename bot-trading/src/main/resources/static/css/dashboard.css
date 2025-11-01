@@ -25,3 +25,106 @@ body {
 .table tbody td {
   vertical-align: middle;
 }
+
+.status-row .status-card {
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+  height: 100%;
+}
+
+.status-title {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.status-pill {
+  display: inline-block;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  background-color: #e5e7eb;
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.status-pill.ok {
+  background-color: #d1fae5;
+  color: #047857;
+}
+
+.status-pill.warn {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-pill.error {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-subtext {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.regime-ribbon {
+  height: 12px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
+.regime-legend {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.regime-segment {
+  flex: 1;
+}
+
+.regime-segment.trend-up.vol-lo {
+  background: linear-gradient(90deg, #bbf7d0, #86efac);
+}
+
+.regime-segment.trend-up.vol-hi {
+  background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.regime-segment.trend-down.vol-lo {
+  background: linear-gradient(90deg, #fde68a, #facc15);
+}
+
+.regime-segment.trend-down.vol-hi {
+  background: linear-gradient(90deg, #f87171, #dc2626);
+}
+
+.regime-segment.trend-range.vol-lo {
+  background: linear-gradient(90deg, #bfdbfe, #93c5fd);
+}
+
+.regime-segment.trend-range.vol-hi {
+  background: linear-gradient(90deg, #c7d2fe, #a5b4fc);
+}
+
+.tca-metric {
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem 1rem;
+  height: 100%;
+}
+
+#tcaHourlyTable tbody td {
+  font-size: 0.85rem;
+}

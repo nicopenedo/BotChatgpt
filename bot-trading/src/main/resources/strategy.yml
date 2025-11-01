@@ -1,7 +1,5 @@
 # Composite strategy configuration
-# - thresholds control the weighted sum needed to emit BUY/SELL actions
-# - filters must all pass (return non-FLAT) for a trade to be considered
-# - signals vote with the provided weight * confidence
+# Base sections (thresholds, filters, signals) act as defaults for every preset.
 thresholds:
   buy: 2.0   # aggregate score required to trigger BUY
   sell: 2.0  # aggregate score required to trigger SELL
@@ -77,3 +75,134 @@ signals:
     params:
       confirmation: true
       confirmationBars: 3
+
+presets:
+  preset_up_lo:
+    thresholds:
+      buy: 2.4
+      sell: 1.4
+    signals:
+      - type: EMA_CROSS
+        weight: 1.2
+        confidence: 0.85
+        params:
+          fast: 8
+          slow: 21
+      - type: MACD
+        weight: 1.0
+        confidence: 0.8
+        params:
+          fast: 12
+          slow: 26
+          signal: 9
+      - type: SUPERTREND
+        weight: 0.9
+        confidence: 0.75
+        params:
+          atrPeriod: 10
+          multiplier: 3
+      - type: VWAP
+        weight: 0.6
+        confidence: 0.6
+        params:
+          confirmation: true
+          confirmationBars: 2
+
+  preset_up_hi:
+    thresholds:
+      buy: 2.6
+      sell: 1.2
+    filters:
+      - type: ATR_FILTER
+        params:
+          period: 14
+          minAtr: 8
+    signals:
+      - type: SMA_CROSS
+        weight: 1.1
+        confidence: 0.85
+        params:
+          fast: 5
+          slow: 20
+      - type: MACD
+        weight: 1.0
+        confidence: 0.8
+        params:
+          fast: 12
+          slow: 26
+          signal: 9
+      - type: RSI
+        weight: 0.6
+        confidence: 0.6
+        params:
+          period: 14
+          lower: 35
+          upper: 75
+          trendSma: 50
+
+  preset_range:
+    thresholds:
+      buy: 1.8
+      sell: 1.8
+    signals:
+      - type: BOLLINGER
+        weight: 1.0
+        confidence: 0.7
+        params:
+          period: 20
+          stdDevs: 2.2
+      - type: STOCHASTIC
+        weight: 0.8
+        confidence: 0.65
+        params:
+          k: 14
+          d: 3
+      - type: RSI
+        weight: 0.7
+        confidence: 0.6
+        params:
+          period: 14
+          lower: 35
+          upper: 65
+          trendSma: 34
+
+  preset_down:
+    thresholds:
+      buy: 1.2
+      sell: 2.3
+    signals:
+      - type: EMA_CROSS
+        weight: 1.2
+        confidence: 0.85
+        params:
+          fast: 8
+          slow: 21
+      - type: SUPERTREND
+        weight: 1.0
+        confidence: 0.75
+        params:
+          atrPeriod: 10
+          multiplier: 3.2
+      - type: DONCHIAN
+        weight: 0.8
+        confidence: 0.65
+        params:
+          period: 30
+
+router:
+  rules:
+    - when:
+        trend: UP
+        vol: LO
+      use: preset_up_lo
+    - when:
+        trend: UP
+        vol: HI
+      use: preset_up_hi
+    - when:
+        trend: RANGE
+      use: preset_range
+    - when:
+        trend: DOWN
+      use: preset_down
+

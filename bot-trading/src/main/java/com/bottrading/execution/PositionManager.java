@@ -14,6 +14,7 @@ import com.bottrading.repository.ManagedOrderRepository;
 import com.bottrading.repository.PositionRepository;
 import com.bottrading.repository.TradeRepository;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.risk.drift.DriftWatchdog;
 import com.bottrading.util.IdGenerator;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -54,6 +55,7 @@ public class PositionManager {
   private final Counter ordersFilled;
   private final Counter ordersCanceled;
   private final Counter ocoCorrections;
+  private final DriftWatchdog driftWatchdog;
   private final ConcurrentMap<Long, ReentrantLock> positionLocks = new ConcurrentHashMap<>();
 
   public PositionManager(
@@ -65,7 +67,8 @@ public class PositionManager {
       OcoProperties ocoProperties,
       PositionManagerProperties positionManagerProperties,
       MeterRegistry meterRegistry,
-      Optional<Clock> clock) {
+      Optional<Clock> clock,
+      DriftWatchdog driftWatchdog) {
     this.positionRepository = positionRepository;
     this.managedOrderRepository = managedOrderRepository;
     this.tradeRepository = tradeRepository;
@@ -80,6 +83,7 @@ public class PositionManager {
     this.ordersFilled = meterRegistry.counter("orders.filled");
     this.ordersCanceled = meterRegistry.counter("orders.canceled");
     this.ocoCorrections = meterRegistry.counter("oco.corrections");
+    this.driftWatchdog = driftWatchdog;
   }
 
   @Transactional
@@ -222,6 +226,11 @@ public class PositionManager {
     trade.setExecutedAt(Instant.now(clock));
     tradeRepository.save(trade);
 
+    BigDecimal incrementalPnl = incrementalPnl(position, lastFilled, price);
+    if (incrementalPnl != null) {
+      driftWatchdog.recordLiveTrade(position.getSymbol(), incrementalPnl.doubleValue());
+    }
+
     ManagedOrderType type = order.getType();
     if (type == ManagedOrderType.TAKE_PROFIT) {
       notifier.notifyTakeProfit(position.getSymbol(), order.getSide(), price, realisedPnl(position, price));
@@ -244,6 +253,17 @@ public class PositionManager {
       diff = diff.negate();
     }
     return diff.multiply(position.getQtyInit()).setScale(8, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal incrementalPnl(PositionEntity position, BigDecimal filledQty, BigDecimal exitPrice) {
+    if (filledQty == null || exitPrice == null) {
+      return null;
+    }
+    BigDecimal diff = exitPrice.subtract(position.getEntryPrice());
+    if (position.getSide() == OrderSide.SELL) {
+      diff = diff.negate();
+    }
+    return diff.multiply(filledQty).setScale(8, RoundingMode.HALF_UP);
   }
 
   private void adjustOppositeQuantity(PositionEntity position, ManagedOrderEntity filled, BigDecimal qtyDelta) {

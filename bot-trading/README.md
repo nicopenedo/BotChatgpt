@@ -1,7 +1,7 @@
 # Binance Spot Scalping Bot
 
 ## Introducción
-Este proyecto provee un bot de scalping para Binance Spot construido con Spring Boot 3 y Java 21. El objetivo es entregar una base robusta, segura y lista para producción que permita operar un símbolo (por defecto `BTCUSDT`) y extenderse fácilmente a múltiples mercados.
+Este proyecto provee un bot de scalping para Binance Spot construido con Spring Boot 3 y Java 21. El objetivo es entregar una base robusta, segura y lista para producción que opere varios símbolos en paralelo (por defecto `BTCUSDT`, `ETHUSDT`, `BNBUSDT`) y pueda adaptarse dinámicamente a distintos regímenes de mercado.
 
 ```
 +-------------------+        +-------------------+        +------------------+
@@ -24,6 +24,10 @@ Este proyecto provee un bot de scalping para Binance Spot construido con Spring 
 - **Caffeine**: cacheos críticos (exchange info, comisiones).
 - **Micrometer + Prometheus**: observabilidad.
 - **PostgreSQL + JPA + Flyway**: persistencia transaccional con migraciones versionadas.
+- **Regime Engine + Strategy Router**: clasifica cada vela en UP/DOWN/RANGE con volatilidad HI/LO y enruta presets de señales automáticamente.
+- **Allocator multi-activo**: gobierna el sizing por símbolo, riesgo agregado y correlación máxima.
+- **Drift & Health Watchdog**: compara live vs shadow/expected, aplica degradaciones automáticas y pausa si hay problemas de conectividad/API.
+- **TCA Service**: registra slippage en bps, colas y recomienda LIMIT/MARKET según condiciones reales.
 
 ## Requisitos previos
 - Java 21
@@ -41,6 +45,7 @@ Variables principales:
 - `BINANCE_API_KEY`, `BINANCE_API_SECRET`: credenciales Binance (usar testnet por defecto).
 - `BINANCE_BASE_URL`: `https://testnet.binance.vision` para modo demo.
 - Parámetros `TRADING_*` para controlar riesgo y estrategia.
+- `TRADING_SYMBOLS`, `ROUTER_ENABLED`, `ALLOCATOR_*`, `DRIFT_*`, `HEALTH_*`, `TCA_*` para activar el router por régimen, el asignador multi-activo, el watchdog de deriva/salud y el módulo de TCA.
 - Configuración de base de datos `SPRING_DATASOURCE_*`.
 
 > **Seguridad:** No se versionan secretos reales. El archivo `.secrets.baseline` permite integrar `detect-secrets` en el flujo de pre-commit.
@@ -77,6 +82,9 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/api/market/vwap?symbol=BTCUSDT&interval=1m` | `VIEWER` | VWAP diario o anclado (`anchorTs`). |
 | GET | `/api/indicators/atr-bands?symbol=BTCUSDT&interval=1m&period=14&mult=1.0` | `VIEWER` | Bandas ATR (mid/upper/lower). |
 | GET | `/api/indicators/supertrend?symbol=BTCUSDT&interval=1m&atrPeriod=14&multiplier=3` | `VIEWER` | Serie Supertrend (opcional). |
+| GET | `/api/regime/status?symbol=BTCUSDT` | `VIEWER` | Estado actual del Regime Engine (trend/vol, ATR/ADX normalizados e historial reciente). |
+| GET | `/api/status/overview?symbol=BTCUSDT` | `VIEWER` | Resumen live con allocator, drift watchdog, health y modo de trading. |
+| GET | `/api/tca/slippage?symbol=BTCUSDT&from=&to=` | `VIEWER` | Métricas TCA: slippage promedio (bps), colas y agregados por hora/tipo de orden. |
 | GET | `/api/reports/trades` | `VIEWER` | Trades paginados con filtros y export CSV/JSON. |
 | GET | `/api/reports/summary?groupBy=day|week|month|range` | `VIEWER` | Resumen agregado con KPIs. |
 | GET | `/api/reports/equity` | `VIEWER` | Serie de equity y `/api/reports/drawdown`. |
@@ -87,6 +95,9 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/api/account/balances?assets=USDT,BTC` | `READ` | Balances filtrados. |
 | POST | `/admin/kill-switch` | `ADMIN` | Activa kill switch. |
 | POST | `/admin/resume` | `ADMIN` | Desactiva kill switch. |
+| GET | `/admin/drift/status` | `VIEWER` | Estado del watchdog (stage, sizing, métricas live/shadow). |
+| POST | `/admin/drift/reset` | `ADMIN` | Limpia ventanas live/shadow y vuelve a modo LIVE. |
+| POST | `/admin/mode/{live|shadow|pause}` | `ADMIN` | Fuerza modo de operación (Live/Shadow/Pause). |
 | POST | `/admin/scheduler/enable` | `ADMIN` | Habilita el scheduler de velas. |
 | POST | `/admin/scheduler/disable` | `ADMIN` | Deshabilita el scheduler (modo mantenimiento). |
 | GET | `/admin/scheduler/status` | `ADMIN` | Devuelve modo (`ws`/`polling`), última `decisionKey`, flags y cooldown restante. |
@@ -106,6 +117,9 @@ La ruta `GET /ui/dashboard` (rol `VIEWER`) habilita un panel completo construido
 - **Marcadores avanzados:** BUY/SELL, SL, TP, BE y Trailing con tooltip (PnL, fee, slippage en bps, nota de decisión).
 - **Curvas sincronizadas:** equity y drawdown reaccionan al crosshair del gráfico de precio.
 - **Heatmap PnL:** vista 7×24 coloreada según net PnL/win rate, exportable CSV.
+- **Cinta de régimen:** barra de colores en la parte superior del gráfico con el histórico reciente (UP/DOWN/RANGE y volatilidad HI/LO) y leyenda con ATR/ADX normalizados.
+- **Badges en vivo:** allocator, drift watchdog, health y modo de trading muestran estado, razón y sizing aplicado en tiempo real.
+- **Panel TCA:** promedio de slippage en bps, colas (ms) y tabla por hora/tipo alimentada con fills live/shadow.
 - **KPIs:** Net PnL, Trades, Win rate, Profit factor, Max DD, Sharpe y Sortino actualizados al rango activo.
 - **Tablas:** trades paginados y resúmenes diarios/semanales/mensuales o por rango.
 - **Exports:** botones directos para CSV/JSON (trades, summary, equity, heatmap) y PNG del gráfico principal.
@@ -141,7 +155,9 @@ Para iniciar sesión demo usar `viewer/viewerPass`. El front consume los endpoin
 - Salud en `/actuator/health`.
 - Contadores: `scheduler.candle.decisions{result=BUY|SELL|FLAT|SKIPPED,...}`, `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
 - Temporizador: `scheduler.candle.duration.ms`.
-- Gauges: `risk.drawdown`, `risk.equity`.
+- Contadores adicionales: `router.selections{preset}`, `allocator.opens.allowed/blocked`, `drift.downgrades`, `health.pauses`, `tca.samples{symbol,type}`.
+- Temporizador: `scheduler.candle.duration.ms`.
+- Gauges: `risk.drawdown`, `risk.equity`, `regime.time_share{symbol,type,value}`, `tca.slippage.avg_bps{symbol}`, `drift.sizing.multiplier`, `health.status`.
 
 ## Research: Backtesting & GA
 - Nuevo módulo en `com.bottrading.research` con:
@@ -161,6 +177,7 @@ mvn test
 Incluye:
 - Unitarias para utilidades de normalización y validación de órdenes.
 - Integración con WireMock simulando respuestas Binance.
+- Nuevas unitarias para `RegimeEngine`, `StrategyRouter`, `AllocatorService`, `DriftWatchdog` y `TcaService`.
 - Nota: la ejecución requiere acceso a Maven Central; si se observa un `403 Forbidden` al resolver
   dependencias, configure un mirror corporativo o repositorio alterno antes de volver a ejecutar
   los tests.
