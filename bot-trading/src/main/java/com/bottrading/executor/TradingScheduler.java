@@ -10,6 +10,7 @@ import com.bottrading.service.StrategyService;
 import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.health.HealthService;
+import com.bottrading.bandit.BanditArmRole;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradingState;
 import com.bottrading.service.risk.drift.DriftWatchdog;
@@ -19,6 +20,7 @@ import com.bottrading.service.trading.AllocatorService.AllocationDecision;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyDecision;
+import com.bottrading.service.preset.CanaryStageService;
 import com.bottrading.throttle.Endpoint;
 import com.bottrading.throttle.Throttle;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -75,6 +77,7 @@ public class TradingScheduler {
   private final ChaosSuite chaosSuite;
   private final CandleSanitizer candleSanitizer;
   private final AnomalyDetector anomalyDetector;
+  private final CanaryStageService canaryStageService;
 
   private final Lock executionLock = new ReentrantLock();
   private final AtomicBoolean enabled = new AtomicBoolean(true);
@@ -99,7 +102,8 @@ public class TradingScheduler {
       Throttle throttle,
       ChaosSuite chaosSuite,
       AnomalyDetector anomalyDetector,
-      CandleSanitizer candleSanitizer) {
+      CandleSanitizer candleSanitizer,
+      CanaryStageService canaryStageService) {
     this.tradingProps = tradingProps;
     this.strategyService = strategyService;
     this.tradingState = tradingState;
@@ -117,6 +121,7 @@ public class TradingScheduler {
     this.chaosSuite = Objects.requireNonNull(chaosSuite, "chaosSuite");
     this.candleSanitizer = Objects.requireNonNull(candleSanitizer, "candleSanitizer");
     this.anomalyDetector = Objects.requireNonNull(anomalyDetector, "anomalyDetector");
+    this.canaryStageService = Objects.requireNonNull(canaryStageService, "canaryStageService");
     this.decisionTimer =
         Timer.builder("scheduler.candle.duration.ms")
             .publishPercentileHistogram()
@@ -389,6 +394,12 @@ public class TradingScheduler {
     }
     double finalMultiplier = allocation.sizingMultiplier() * driftWatchdog.sizingMultiplier();
     finalMultiplier *= anomalyDetector.sizingMultiplier(context.symbol());
+    if (decision.banditSelection() != null
+        && decision.banditSelection().role() == BanditArmRole.CANDIDATE) {
+      double stageMultiplier =
+          canaryStageService.multiplier(decision.banditSelection().presetId());
+      finalMultiplier *= stageMultiplier;
+    }
     if (finalMultiplier <= 0) {
       return GateResult.blocked("SIZING_ZERO", 0);
     }

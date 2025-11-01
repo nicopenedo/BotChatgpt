@@ -2,6 +2,7 @@ package com.bottrading.research;
 
 import com.bottrading.research.backtest.BacktestEngine;
 import com.bottrading.research.backtest.ReportWriter;
+import com.bottrading.research.nightly.NightlyReportGenerator;
 import com.bottrading.research.io.ChartExporter;
 import com.bottrading.research.io.CsvWriter;
 import com.bottrading.research.io.DataLoader;
@@ -51,5 +52,10 @@ public class ResearchConfig {
   public BacktestEngine backtestEngine(
       DataLoader dataLoader, StrategyFactory strategyFactory, ReportWriter reportWriter) {
     return new BacktestEngine(dataLoader, strategyFactory, reportWriter, BigDecimal.valueOf(10000));
+  }
+
+  @Bean
+  public NightlyReportGenerator nightlyReportGenerator() {
+    return new NightlyReportGenerator();
   }
 }

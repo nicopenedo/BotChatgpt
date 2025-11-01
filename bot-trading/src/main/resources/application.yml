@@ -1,3 +1,33 @@
+research:
+  nightly:
+    enabled: true
+    start-cron: "0 20 * * *"
+    zone: UTC
+    dataset:
+      symbol: BTCUSDT
+      interval: 1m
+      history-days: 180
+      use-cache: true
+    ga:
+      population: 30
+      generations: 20
+      seed: 42
+      min-trades: 150
+      min-samples: 100
+      complexity-penalty: 0.5
+      train-days: 90
+      validation-days: 30
+      test-days: 30
+    gate:
+      epsilon-pf: 0.10
+      maxdd-cap-pct: 8.0
+      min-trades-oos: 150
+      shadow-min-trades: 50
+      shadow-pf-drop-tolerance: 0.15
+      pf-baseline: 1.0
+    reporting:
+      base-dir: reports/nightly
+
 presets:
   promotion:
     epsilon_pf: 0.10
