@@ -31,7 +31,26 @@
     kpiContainer: document.getElementById('kpiContainer'),
     tradesTable: document.querySelector('#tradesTable tbody'),
     summaryTable: document.querySelector('#summaryTable tbody'),
-    heatmap: document.getElementById('heatmap')
+    heatmap: document.getElementById('heatmap'),
+    regimeRibbon: document.getElementById('regimeRibbon'),
+    regimeLegend: document.getElementById('regimeLegend'),
+    status: {
+      allocatorBadge: document.getElementById('allocatorBadge'),
+      allocatorNote: document.getElementById('allocatorNote'),
+      driftBadge: document.getElementById('driftBadge'),
+      driftNote: document.getElementById('driftNote'),
+      healthBadge: document.getElementById('healthBadge'),
+      healthNote: document.getElementById('healthNote'),
+      modeBadge: document.getElementById('modeBadge'),
+      modeNote: document.getElementById('modeNote')
+    },
+    tca: {
+      samples: document.getElementById('tcaSamples'),
+      avgBps: document.getElementById('tcaAvgBps'),
+      avgQueue: document.getElementById('tcaAvgQueue'),
+      recommendation: document.getElementById('tcaRecommendation'),
+      hourlyBody: document.querySelector('#tcaHourlyTable tbody')
+    }
   };
 
   function initFromDefaults() {
@@ -207,11 +226,33 @@
     } else {
       requests.push(Promise.resolve({ data: [] }));
     }
+    requests.push(axios.get('/api/regime/status', { params: { symbol: params.symbol } }));
+    requests.push(axios.get('/api/status/overview', { params: { symbol: params.symbol } }));
+    requests.push(
+      axios.get('/api/tca/slippage', {
+        params: { symbol: params.symbol, from: params.from || undefined, to: params.to || undefined }
+      })
+    );
     return Promise.all(requests);
   }
 
   function renderCharts(params, responses) {
-    const [klinesRes, tradesRes, summaryRes, equityRes, drawdownRes, annotationsRes, heatmapRes, vwapRes, anchoredVwapRes, atrRes, supertrendRes] = responses;
+    const [
+      klinesRes,
+      tradesRes,
+      summaryRes,
+      equityRes,
+      drawdownRes,
+      annotationsRes,
+      heatmapRes,
+      vwapRes,
+      anchoredVwapRes,
+      atrRes,
+      supertrendRes,
+      regimeStatusRes,
+      overviewRes,
+      tcaRes
+    ] = responses;
     const klines = klinesRes.data || [];
     const candles = toCandle(klines);
     const volumes = toVolume(klines);
@@ -431,6 +472,10 @@
         scales: { x: { type: 'timeseries' } }
       }
     });
+
+    renderRegime(regimeStatusRes?.data);
+    renderStatusCards(overviewRes?.data);
+    renderTcaPanel(tcaRes?.data);
   }
 
   function buildKpi(summary) {
@@ -512,6 +557,185 @@
     }));
     const max = Math.max(...values.map((v) => Math.abs(v.value)), 1);
     heatmapInstance.setData({ max, data: values });
+  }
+
+  function renderRegime(payload) {
+    const ribbon = elements.regimeRibbon;
+    const legend = elements.regimeLegend;
+    if (!ribbon || !legend) return;
+    ribbon.innerHTML = '';
+    if (!payload || !payload.status) {
+      legend.textContent = '--';
+      return;
+    }
+    const current = payload.status;
+    const history = Array.isArray(current.history) ? current.history.slice(-60) : [];
+    const segments = history
+      .map((entry) => ({
+        entry,
+        ts: entry.timestamp ? new Date(entry.timestamp).getTime() : Number.NaN
+      }))
+      .filter((item) => Number.isFinite(item.ts))
+      .sort((a, b) => a.ts - b.ts);
+
+    if (!segments.length) {
+      legend.textContent = 'No regime data';
+    }
+
+    for (let i = 0; i < segments.length; i++) {
+      const { entry, ts } = segments[i];
+      const nextTs = i < segments.length - 1 ? segments[i + 1].ts : ts + 60_000;
+      const duration = Math.max(1, nextTs - ts);
+      const trend = (entry.trend || 'RANGE').toLowerCase();
+      const volatility = (entry.volatility || 'LO').toLowerCase();
+      const segment = document.createElement('div');
+      segment.className = `regime-segment trend-${trend} vol-${volatility}`;
+      segment.style.flexGrow = duration.toString();
+      segment.title = `${entry.trend || 'RANGE'} / ${entry.volatility || 'LO'}`;
+      ribbon.appendChild(segment);
+    }
+
+    if (current.regime) {
+      const r = current.regime;
+      const atrValue =
+        typeof r.normalizedAtr === 'number' && Number.isFinite(r.normalizedAtr)
+          ? `${(r.normalizedAtr * 100).toFixed(2)}%`
+          : '--';
+      const adxValue =
+        typeof r.adx === 'number' && Number.isFinite(r.adx) ? r.adx.toFixed(1) : '--';
+      legend.textContent = `${r.trend} · ${r.volatility} · ATR ${atrValue} · ADX ${adxValue}`;
+    } else {
+      legend.textContent = '--';
+    }
+  }
+
+  function setPill(element, label, state) {
+    if (!element) return;
+    element.textContent = label || '--';
+    element.classList.remove('ok', 'warn', 'error');
+    if (state) {
+      element.classList.add(state);
+    }
+  }
+
+  function renderStatusCards(overview) {
+    const status = elements.status;
+    if (!status) return;
+    if (!overview) {
+      Object.values(status).forEach((el) => {
+        if (el) {
+          el.classList && el.classList.remove('ok', 'warn', 'error');
+          el.textContent = '--';
+        }
+      });
+      return;
+    }
+
+    const allocator = overview.allocator;
+    if (allocator) {
+      setPill(status.allocatorBadge, allocator.allowed ? 'Allowed' : 'Blocked', allocator.allowed ? 'ok' : 'error');
+      status.allocatorNote.textContent = `${allocator.reason || 'OK'} · x${Number(
+        allocator.sizingMultiplier ?? 1
+      ).toFixed(2)}`;
+    } else {
+      setPill(status.allocatorBadge, '--');
+      status.allocatorNote.textContent = '--';
+    }
+
+    const drift = overview.drift;
+    if (drift) {
+      const stage = (drift.stage || 'NORMAL').toUpperCase();
+      const stageState = stage === 'NORMAL' ? 'ok' : stage === 'REDUCED' ? 'warn' : 'error';
+      setPill(status.driftBadge, stage, stageState);
+      const pf =
+          drift.live && Number.isFinite(drift.live.profitFactor)
+            ? drift.live.profitFactor.toFixed(2)
+            : '--';
+      const win =
+          drift.live && Number.isFinite(drift.live.winRate)
+            ? `${(drift.live.winRate * 100).toFixed(1)}%`
+            : '--';
+      status.driftNote.textContent = `x${Number(drift.sizingMultiplier ?? 1).toFixed(2)} · PF ${pf} · Win ${win}`;
+    } else {
+      setPill(status.driftBadge, '--');
+      status.driftNote.textContent = '--';
+    }
+
+    const health = overview.health;
+    if (health) {
+      const healthy = Boolean(health.healthy);
+      const healthState = healthy ? 'ok' : 'error';
+      setPill(status.healthBadge, healthy ? 'Healthy' : 'Degraded', healthState);
+      const errorRate = Number.isFinite(health.apiErrorRatePct)
+        ? `${Number(health.apiErrorRatePct).toFixed(1)}%`
+        : '--';
+      status.healthNote.textContent = `Errors ${errorRate} · WS ${health.wsReconnects ?? 0}/h`;
+    } else {
+      setPill(status.healthBadge, '--');
+      status.healthNote.textContent = '--';
+    }
+
+    const trading = overview.trading || {};
+    const killSwitch = Boolean(trading.killSwitch);
+    const liveEnabled = Boolean(trading.liveEnabled);
+    const mode = (trading.mode || 'UNKNOWN').toString().toUpperCase();
+    let label = 'Shadow';
+    let state = 'warn';
+    if (killSwitch || mode === 'PAUSED') {
+      label = 'Paused';
+      state = 'error';
+    } else if (liveEnabled) {
+      label = 'Live';
+      state = 'ok';
+    } else if (mode === 'LIVE') {
+      label = 'Live (disabled)';
+    }
+    setPill(status.modeBadge, label, state);
+    status.modeNote.textContent = `Mode ${mode} · Kill-switch ${killSwitch ? 'ON' : 'OFF'}`;
+  }
+
+  function renderTcaPanel(stats) {
+    const tca = elements.tca;
+    if (!tca) return;
+    if (!stats) {
+      tca.samples.textContent = '0 samples';
+      tca.avgBps.textContent = '--';
+      tca.avgQueue.textContent = '--';
+      tca.recommendation.textContent = '--';
+      if (tca.hourlyBody) tca.hourlyBody.innerHTML = '';
+      return;
+    }
+    const samples = Number(stats.samples || 0);
+    tca.samples.textContent = `${samples} sample${samples === 1 ? '' : 's'}`;
+    tca.avgBps.textContent = Number.isFinite(stats.averageBps) ? stats.averageBps.toFixed(2) : '--';
+    tca.avgQueue.textContent = Number.isFinite(stats.averageQueueMs)
+      ? stats.averageQueueMs.toFixed(0)
+      : '--';
+    let recommendation = '--';
+    if (samples > 0 && Number.isFinite(stats.averageBps)) {
+      if (stats.averageBps > 8) {
+        recommendation = 'Prefer LIMIT';
+      } else if (stats.averageBps < 4) {
+        recommendation = 'Prefer MARKET';
+      } else {
+        recommendation = 'Keep baseline';
+      }
+    }
+    tca.recommendation.textContent = recommendation;
+
+    if (tca.hourlyBody) {
+      tca.hourlyBody.innerHTML = '';
+      const entries = Object.entries(stats.hourlyAverage || {})
+        .map(([hour, value]) => ({ hour: Number(hour), value: Number(value) }))
+        .filter((item) => Number.isFinite(item.hour))
+        .sort((a, b) => a.hour - b.hour);
+      entries.forEach(({ hour, value }) => {
+        const row = document.createElement('tr');
+        const hourLabel = `${hour.toString().padStart(2, '0')}:00`;
+        row.innerHTML = `<td>${hourLabel}</td><td>${Number.isFinite(value) ? value.toFixed(2) : '--'}</td>`;
+        tca.hourlyBody.appendChild(row);
+      });
+    }
   }
 
   function buildMarkers(annotations) {

@@ -1,6 +1,7 @@
 package com.bottrading.executor;
 
 import com.bottrading.config.BinanceProperties;
+import com.bottrading.service.health.HealthService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -32,6 +33,7 @@ public class WSKlineSubscriber {
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
   private final ScheduledExecutorService scheduler;
+  private final HealthService healthService;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean healthy = new AtomicBoolean(false);
   private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
@@ -41,8 +43,9 @@ public class WSKlineSubscriber {
   private volatile String symbol;
   private volatile String interval;
 
-  public WSKlineSubscriber(BinanceProperties binanceProperties) {
+  public WSKlineSubscriber(BinanceProperties binanceProperties, HealthService healthService) {
     this.binanceProperties = binanceProperties;
+    this.healthService = healthService;
     this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     this.objectMapper = new ObjectMapper();
     this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -108,6 +111,7 @@ public class WSKlineSubscriber {
 
   private void scheduleReconnect() {
     healthy.set(false);
+    healthService.onWebsocketReconnect();
     if (!running.get()) {
       return;
     }

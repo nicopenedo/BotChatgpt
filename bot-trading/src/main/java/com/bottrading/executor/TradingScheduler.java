@@ -8,10 +8,15 @@ import com.bottrading.repository.DecisionRepository;
 import com.bottrading.service.OrderExecutionService;
 import com.bottrading.service.StrategyService;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.health.HealthService;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradingState;
+import com.bottrading.service.risk.drift.DriftWatchdog;
+import com.bottrading.service.trading.AllocatorService;
+import com.bottrading.service.trading.AllocatorService.AllocationDecision;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
+import com.bottrading.strategy.StrategyDecision;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -21,11 +26,15 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,12 +62,15 @@ public class TradingScheduler {
   private final DecisionRepository decisionRepository;
   private final MeterRegistry meterRegistry;
   private final WSKlineSubscriber klineSubscriber;
+  private final AllocatorService allocatorService;
+  private final DriftWatchdog driftWatchdog;
+  private final HealthService healthService;
   private final Clock clock;
   private final Timer decisionTimer;
 
   private final Lock executionLock = new ReentrantLock();
   private final AtomicBoolean enabled = new AtomicBoolean(true);
-  private final AtomicLong lastCloseTime = new AtomicLong(-1);
+  private final ConcurrentMap<String, AtomicLong> lastCloseTimes = new ConcurrentHashMap<>();
   private final AtomicReference<String> lastDecisionKey = new AtomicReference<>("NONE");
   private final Deque<Instant> orderTimes = new ConcurrentLinkedDeque<>();
 
@@ -72,6 +84,9 @@ public class TradingScheduler {
       DecisionRepository decisionRepository,
       MeterRegistry meterRegistry,
       WSKlineSubscriber klineSubscriber,
+      AllocatorService allocatorService,
+      DriftWatchdog driftWatchdog,
+      HealthService healthService,
       ObjectProvider<Clock> clockProvider) {
     this.tradingProps = tradingProps;
     this.strategyService = strategyService;
@@ -82,6 +97,9 @@ public class TradingScheduler {
     this.decisionRepository = decisionRepository;
     this.meterRegistry = meterRegistry;
     this.klineSubscriber = klineSubscriber;
+    this.allocatorService = allocatorService;
+    this.driftWatchdog = driftWatchdog;
+    this.healthService = healthService;
     this.clock = Objects.requireNonNullElse(clockProvider.getIfAvailable(), Clock.systemUTC());
     this.decisionTimer =
         Timer.builder("scheduler.candle.duration.ms")
@@ -92,6 +110,9 @@ public class TradingScheduler {
 
   @PostConstruct
   void init() {
+    for (String symbol : tradingProps.getSymbols()) {
+      lastCloseTimes.putIfAbsent(symbol, new AtomicLong(-1));
+    }
     if (tradingProps.getMode() == Mode.WEBSOCKET) {
       klineSubscriber.start(tradingProps.getSymbol(), tradingProps.getInterval(), this::onKline);
     } else {
@@ -116,7 +137,10 @@ public class TradingScheduler {
         enabled.get(),
         tradingProps.isLiveEnabled() && tradingState.isLiveEnabled(),
         secondsRemaining,
-        lastCloseTime.get());
+        lastCloseTimes
+            .getOrDefault(tradingProps.getSymbol(), new AtomicLong(-1))
+            .get(),
+        tradingState.getMode().name().toLowerCase());
   }
 
   private void onKline(KlineEvent event) {
@@ -132,33 +156,46 @@ public class TradingScheduler {
 
   @Scheduled(fixedDelayString = "${trading.poll-delay-ms:1500}")
   public void pollCandles() {
-    if (!shouldPoll()) {
+    if (!enabled.get()) {
       return;
     }
-    try {
-      List<Kline> klines = binanceClient.getKlines(tradingProps.getSymbol(), tradingProps.getInterval(), 2);
-      if (klines == null || klines.isEmpty()) {
-        return;
+    List<String> symbols = tradingProps.getSymbols();
+    for (String symbol : symbols) {
+      if (!shouldPoll(symbol)) {
+        continue;
       }
-      Kline last = klines.get(klines.size() - 1);
-      long closeTime = last.closeTime().toEpochMilli();
-      if (closeTime <= lastCloseTime.get()) {
-        return;
+      try {
+        long start = System.nanoTime();
+        List<Kline> klines = binanceClient.getKlines(symbol, tradingProps.getInterval(), 2);
+        long latencyMs = (System.nanoTime() - start) / 1_000_000;
+        healthService.onApiCall(latencyMs, klines != null);
+        if (klines == null || klines.isEmpty()) {
+          continue;
+        }
+        Kline last = klines.get(klines.size() - 1);
+        long closeTime = last.closeTime().toEpochMilli();
+        AtomicLong lastClose = lastCloseTimes.computeIfAbsent(symbol, s -> new AtomicLong(-1));
+        if (closeTime <= lastClose.get()) {
+          continue;
+        }
+        processCandle(symbol, tradingProps.getInterval(), closeTime, "polling");
+      } catch (Exception ex) {
+        log.warn("Polling klines failed for {}: {}", symbol, ex.getMessage());
       }
-      processCandle(tradingProps.getSymbol(), tradingProps.getInterval(), closeTime, "polling");
-    } catch (Exception ex) {
-      log.warn("Polling klines failed: {}", ex.getMessage());
     }
   }
 
-  private boolean shouldPoll() {
+  private boolean shouldPoll(String symbol) {
     if (!enabled.get()) {
       return false;
     }
     if (tradingProps.getMode() == Mode.POLLING) {
       return true;
     }
-    return !klineSubscriber.isHealthy();
+    if (symbol.equalsIgnoreCase(tradingProps.getSymbol())) {
+      return !klineSubscriber.isHealthy();
+    }
+    return true;
   }
 
   private void processCandle(String symbol, String interval, long closeTime, String source) {
@@ -182,10 +219,10 @@ public class TradingScheduler {
         incrementDecisionMetric("SKIPPED", "DUPLICATE");
         return;
       }
-      lastCloseTime.set(closeTime);
+      lastCloseTimes.computeIfAbsent(symbol, s -> new AtomicLong(-1)).set(closeTime);
       Timer.Sample sample = Timer.start(clock);
       try {
-        SignalResult decision = strategyService.decide(symbol);
+        StrategyDecision decision = strategyService.decide(symbol);
         DecisionContext context = new DecisionContext(decisionKey, symbol, interval, closeTime, now, source);
         handleDecision(context, decision);
       } finally {
@@ -196,10 +233,11 @@ public class TradingScheduler {
     }
   }
 
-  private void handleDecision(DecisionContext context, SignalResult decision) {
+  private void handleDecision(DecisionContext context, StrategyDecision decision) {
+    SignalResult signal = decision.signal();
     DecisionRecord record = new DecisionRecord(decision, context);
-    if (decision.side() == SignalSide.FLAT) {
-      record.reason(decision.note());
+    if (signal.side() == SignalSide.FLAT) {
+      record.reason(signal.note());
       record.executed(false);
       persistDecision(record);
       incrementDecisionMetric("FLAT", "SIGNAL");
@@ -208,7 +246,7 @@ public class TradingScheduler {
 
     GateResult gateResult = evaluateGates(context, decision);
     if (!gateResult.allowed()) {
-      record.reason(decision.note() + " | " + gateResult.reason());
+      record.reason(signal.note() + " | " + gateResult.reason());
       record.executed(false);
       persistDecision(record);
       incrementDecisionMetric("SKIPPED", gateResult.reason());
@@ -216,15 +254,21 @@ public class TradingScheduler {
     }
 
     Optional<OrderResponse> response =
-        orderExecutionService.execute(context.decisionKey(), decision, context.closeTime());
+        orderExecutionService.execute(
+            context.decisionKey(),
+            context.symbol(),
+            context.interval(),
+            decision,
+            context.closeTime(),
+            gateResult.sizingMultiplier());
     if (response.isPresent()) {
       record.executed(true);
       record.orderId(response.get().orderId());
       persistDecision(record);
-      registerOrder(decision.side());
-      incrementDecisionMetric(decision.side() == SignalSide.BUY ? "BUY" : "SELL", context.source());
+      registerOrder(signal.side());
+      incrementDecisionMetric(signal.side() == SignalSide.BUY ? "BUY" : "SELL", context.source());
     } else {
-      record.reason(decision.note() + " | EXECUTION_FAILED");
+      record.reason(signal.note() + " | EXECUTION_FAILED");
       record.executed(false);
       persistDecision(record);
       incrementDecisionMetric("SKIPPED", "EXECUTION_FAILED");
@@ -244,8 +288,8 @@ public class TradingScheduler {
     entity.setInterval(record.context().interval());
     entity.setCloseTime(Instant.ofEpochMilli(record.context().closeTime()));
     entity.setDecidedAt(record.context().decidedAt());
-    entity.setSide(record.decision().side());
-    entity.setConfidence(record.decision().confidence());
+    entity.setSide(record.decision().signal().side());
+    entity.setConfidence(record.decision().signal().confidence());
     entity.setReason(record.reason());
     entity.setExecuted(record.executed());
     entity.setOrderId(record.orderId());
@@ -263,26 +307,43 @@ public class TradingScheduler {
     }
   }
 
-  private GateResult evaluateGates(DecisionContext context, SignalResult decision) {
-    if (!tradingState.isLiveEnabled() || !tradingProps.isLiveEnabled()) {
-      return GateResult.blocked("LIVE_DISABLED");
+  private GateResult evaluateGates(DecisionContext context, StrategyDecision decision) {
+    if (!tradingProps.isLiveEnabled() || !tradingState.isLiveEnabled()) {
+      return GateResult.blocked("LIVE_DISABLED", 0);
     }
     if (tradingState.isKillSwitchActive()) {
-      return GateResult.blocked("KILL_SWITCH");
+      return GateResult.blocked("KILL_SWITCH", 0);
     }
     if (!riskGuard.canTrade()) {
-      return GateResult.blocked("RISK_GUARD");
+      return GateResult.blocked("RISK_GUARD", 0);
     }
     if (!withinTradingWindow(context.decidedAt())) {
-      return GateResult.blocked("WINDOW");
+      return GateResult.blocked("WINDOW", 0);
     }
-    if (!hasSufficientVolume()) {
-      return GateResult.blocked("VOLUME");
+    if (!hasSufficientVolume(context.symbol())) {
+      return GateResult.blocked("VOLUME", 0);
     }
     if (!withinOrderRate(context.decidedAt())) {
-      return GateResult.blocked("RATE_LIMIT");
+      return GateResult.blocked("RATE_LIMIT", 0);
     }
-    return GateResult.allowed();
+    if (!healthService.isHealthy()) {
+      return GateResult.blocked("HEALTH", 0);
+    }
+    if (!driftWatchdog.allowTrading() || tradingState.getMode() == TradingState.Mode.PAUSED) {
+      return GateResult.blocked("DRIFT_PAUSED", 0);
+    }
+    if (tradingState.getMode() == TradingState.Mode.SHADOW) {
+      return GateResult.blocked("DRIFT_SHADOW", 0);
+    }
+    AllocationDecision allocation = allocatorService.evaluate(context.symbol());
+    if (!allocation.allowed()) {
+      return GateResult.blocked(allocation.reason(), 0);
+    }
+    double finalMultiplier = allocation.sizingMultiplier() * driftWatchdog.sizingMultiplier();
+    if (finalMultiplier <= 0) {
+      return GateResult.blocked("SIZING_ZERO", 0);
+    }
+    return GateResult.allowed(finalMultiplier);
   }
 
   private boolean withinOrderRate(Instant now) {
@@ -291,10 +352,10 @@ public class TradingScheduler {
     return placed < tradingProps.getMaxOrdersPerMinute();
   }
 
-  private boolean hasSufficientVolume() {
+  private boolean hasSufficientVolume(String symbol) {
     try {
       return binanceClient
-              .get24hQuoteVolume(tradingProps.getSymbol())
+              .get24hQuoteVolume(symbol)
               .compareTo(tradingProps.getMinVolume24h())
           >= 0;
     } catch (Exception ex) {
@@ -342,7 +403,7 @@ public class TradingScheduler {
   private record DecisionContext(
       String decisionKey, String symbol, String interval, long closeTime, Instant decidedAt, String source) {}
 
-  private record DecisionRecord(SignalResult decision, DecisionContext context) {
+  private record DecisionRecord(StrategyDecision decision, DecisionContext context) {
     private String reason = "";
     private boolean executed;
     private String orderId;
@@ -375,16 +436,22 @@ public class TradingScheduler {
     }
   }
 
-  private record GateResult(boolean allowed, String reason) {
-    static GateResult allowed() {
-      return new GateResult(true, "OK");
+  private record GateResult(boolean allowed, String reason, double sizingMultiplier) {
+    static GateResult allowed(double sizingMultiplier) {
+      return new GateResult(true, "OK", sizingMultiplier);
     }
 
-    static GateResult blocked(String reason) {
-      return new GateResult(false, reason);
+    static GateResult blocked(String reason, double sizingMultiplier) {
+      return new GateResult(false, reason, sizingMultiplier);
     }
   }
 
   public record SchedulerStatus(
-      String mode, String lastDecisionKey, boolean enabled, boolean liveEnabled, long cooldownSeconds, long lastCloseTime) {}
+      String mode,
+      String lastDecisionKey,
+      boolean enabled,
+      boolean liveEnabled,
+      long cooldownSeconds,
+      long lastCloseTime,
+      String tradingMode) {}
 }
