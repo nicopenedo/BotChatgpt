@@ -3,6 +3,8 @@ package com.bottrading.service.tca;
 import com.bottrading.config.TradingProps;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.model.entity.TradeFillEntity;
+import com.bottrading.repository.TradeFillRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -28,13 +30,16 @@ public class TcaService {
 
   private final TradingProps tradingProps;
   private final MeterRegistry meterRegistry;
+  private final TradeFillRepository tradeFillRepository;
   private final Deque<TcaSample> samples;
   private final ConcurrentMap<String, PendingOrder> pending = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AtomicReference<Double>> averageGauge = new ConcurrentHashMap<>();
 
-  public TcaService(TradingProps tradingProps, MeterRegistry meterRegistry) {
+  public TcaService(
+      TradingProps tradingProps, MeterRegistry meterRegistry, TradeFillRepository tradeFillRepository) {
     this.tradingProps = tradingProps;
     this.meterRegistry = meterRegistry;
+    this.tradeFillRepository = tradeFillRepository;
     this.samples = new ArrayDeque<>(tradingProps.getTca().getHistorySize());
   }
 
@@ -64,6 +69,7 @@ public class TcaService {
 
   public void recordFill(
       String clientOrderId,
+      String orderId,
       BigDecimal fillPrice,
       BigDecimal spread,
       Instant timestamp) {
@@ -95,6 +101,7 @@ public class TcaService {
             pendingOrder.atr(),
             spread == null ? null : spread.doubleValue());
     append(sample);
+    persist(sample, orderId, clientOrderId);
   }
 
   public double expectedSlippageBps(String symbol, OrderType type, Instant timestamp) {
@@ -117,7 +124,11 @@ public class TcaService {
       }
     }
     if (relevant.isEmpty()) {
-      return averageSlippage(symbol);
+      List<TcaSample> persisted = fromRepository(symbol, type, targetHour);
+      if (persisted.isEmpty()) {
+        return averageSlippage(symbol);
+      }
+      return persisted.stream().mapToDouble(TcaSample::slippageBps).average().orElse(Double.NaN);
     }
     return relevant.stream().mapToDouble(TcaSample::slippageBps).average().orElse(Double.NaN);
   }
@@ -202,6 +213,52 @@ public class TcaService {
           .mapToDouble(TcaSample::slippageBps)
           .average()
           .orElse(Double.NaN);
+    }
+  }
+
+  private List<TcaSample> fromRepository(String symbol, OrderType type, int hour) {
+    Instant now = Instant.now();
+    Instant start = now.minus(Duration.ofHours(12));
+    List<TradeFillEntity> entities =
+        tradeFillRepository.findBySymbolAndTypeBetween(symbol, type, start, now);
+    List<TcaSample> result = new ArrayList<>();
+    for (TradeFillEntity entity : entities) {
+      if (hourOf(entity.getExecutedAt()) != hour) {
+        continue;
+      }
+      result.add(
+          new TcaSample(
+              entity.getSymbol(),
+              entity.getOrderSide(),
+              entity.getOrderType(),
+              entity.getExecutedAt(),
+              entity.getSlippageBps() == null ? Double.NaN : entity.getSlippageBps(),
+              entity.getQueueTimeMs() == null ? 0 : entity.getQueueTimeMs(),
+              entity.getRefPrice() == null ? null : entity.getRefPrice().doubleValue(),
+              entity.getFillPrice() == null ? null : entity.getFillPrice().doubleValue(),
+              null,
+              null,
+              null));
+    }
+    return result;
+  }
+
+  private void persist(TcaSample sample, String orderId, String clientOrderId) {
+    try {
+      TradeFillEntity entity = new TradeFillEntity();
+      entity.setOrderId(orderId);
+      entity.setClientOrderId(clientOrderId);
+      entity.setSymbol(sample.symbol());
+      entity.setOrderType(sample.type());
+      entity.setOrderSide(sample.side());
+      entity.setRefPrice(sample.referencePrice() == null ? null : BigDecimal.valueOf(sample.referencePrice()));
+      entity.setFillPrice(sample.fillPrice() == null ? null : BigDecimal.valueOf(sample.fillPrice()));
+      entity.setSlippageBps(sample.slippageBps());
+      entity.setQueueTimeMs(sample.queueTimeMs());
+      entity.setExecutedAt(sample.timestamp());
+      tradeFillRepository.save(entity);
+    } catch (Exception ex) {
+      // ignore persistence issues but keep in-memory samples
     }
   }
 

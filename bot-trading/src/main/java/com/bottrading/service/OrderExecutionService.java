@@ -8,11 +8,13 @@ import com.bottrading.execution.PositionManager;
 import com.bottrading.execution.StopEngine;
 import com.bottrading.execution.StopEngine.StopPlan;
 import com.bottrading.model.dto.ExchangeInfo;
-import com.bottrading.model.dto.OrderRequest;
-import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.dto.PriceTicker;
 import com.bottrading.model.enums.OrderSide;
-import com.bottrading.model.enums.OrderType;
+import com.bottrading.execution.ExecutionEngine;
+import com.bottrading.execution.ExecutionEngine.ExecutionResult;
+import com.bottrading.execution.ExecutionRequest;
+import com.bottrading.execution.ExecutionRequest.Urgency;
+import com.bottrading.execution.MarketSnapshot;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradeEvent;
@@ -20,12 +22,11 @@ import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyDecision;
 import com.bottrading.strategy.StrategyContext;
-import com.bottrading.service.tca.TcaService;
-import com.bottrading.util.OrderValidator;
 import com.bottrading.shadow.ShadowEngine;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -49,7 +50,7 @@ public class OrderExecutionService {
   private final StopEngine stopEngine;
   private final PositionManager positionManager;
   private final ShadowEngine shadowEngine;
-  private final TcaService tcaService;
+  private final ExecutionEngine executionEngine;
 
   public OrderExecutionService(
       TradingProps tradingProps,
@@ -61,7 +62,7 @@ public class OrderExecutionService {
       StopEngine stopEngine,
       PositionManager positionManager,
       ShadowEngine shadowEngine,
-      TcaService tcaService) {
+      ExecutionEngine executionEngine) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
     this.orderService = orderService;
@@ -71,10 +72,10 @@ public class OrderExecutionService {
     this.stopEngine = stopEngine;
     this.positionManager = positionManager;
     this.shadowEngine = shadowEngine;
-    this.tcaService = tcaService;
+    this.executionEngine = executionEngine;
   }
 
-  public Optional<OrderResponse> execute(
+  public Optional<ExecutionResult> execute(
       String decisionKey,
       String symbol,
       String interval,
@@ -125,81 +126,137 @@ public class OrderExecutionService {
     request.setDryRun(tradingProps.isDryRun());
     request.setClientOrderId(newClientOrderId(symbol, interval, closeTime));
 
-    OrderType orderType =
-        tcaService.recommendOrderType(symbol, sizingResult.orderType(), Instant.now());
-    request.setType(orderType);
-    if (orderType == OrderType.LIMIT) {
-      request.setPrice(lastPrice);
-    }
-
+    BigDecimal quantity = sizingResult.quantity();
     if (orderSide == OrderSide.BUY) {
-      BigDecimal quantity = sizingResult.quantity();
       BigDecimal requiredQuote = quantity.multiply(lastPrice);
       if (requiredQuote.compareTo(quoteBalance) > 0) {
         log.info("Quote balance {} insufficient for {}", quoteBalance, decisionKey);
         return Optional.empty();
       }
-      request.setQuantity(quantity);
       meterRegistry.counter("orders.queued", BUY_TAG).increment();
     } else {
-      BigDecimal quantity = sizingResult.quantity().min(baseBalance);
+      quantity = quantity.min(baseBalance);
       if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
         log.info("Base balance {} insufficient to sell for {}", baseBalance, decisionKey);
         return Optional.empty();
       }
-      request.setQuantity(quantity);
       meterRegistry.counter("orders.queued", SELL_TAG).increment();
     }
 
-    try {
-      OrderValidator.validate(request, exchangeInfo, lastPrice);
-    } catch (IllegalArgumentException ex) {
-      log.warn("Order validation failed for {}: {}", decisionKey, ex.getMessage());
-      return Optional.empty();
-    }
+    ExecutionRequest request =
+        new ExecutionRequest(
+            symbol,
+            orderSide,
+            quantity,
+            lastPrice,
+            quantity.multiply(lastPrice),
+            exchangeInfo,
+            resolveUrgency(decision.signal().confidence()),
+            estimateMaxSlippageBps(lastPrice, atr),
+            Instant.ofEpochMilli(closeTime).plusSeconds(120),
+            tradingProps.isDryRun(),
+            volume24h,
+            atr,
+            estimateSpreadBps(exchangeInfo, lastPrice),
+            estimateVolatilityBps(atr, lastPrice),
+            0,
+            newClientOrderId(symbol, interval, closeTime));
+
+    MarketSnapshot snapshot =
+        new MarketSnapshot(
+            lastPrice,
+            request.spreadBps(),
+            request.expectedVolatilityBps(),
+            request.latencyMs(),
+            estimateBarVolume(volume24h),
+            estimateQuoteBarVolume(volume24h, lastPrice));
 
     try {
-      tcaService.recordSubmission(
-          request.getClientOrderId(), symbol, orderSide, orderType, lastPrice, volume24h, atr, Instant.now());
-      OrderResponse response = orderService.placeOrder(request);
+      ExecutionResult result = executionEngine.execute(request, snapshot);
       log.info(
-          "Order {} executed: side={} qty={} quote={} status={} dryRun={}",
+          "Order {} executed plan={} executedQty={} avgPrice={} dryRun={}",
           decisionKey,
-          request.getSide(),
-          request.getQuantity(),
-          request.getQuoteAmount(),
-          response.status(),
-          request.isDryRun());
-      if (!request.isDryRun()) {
-        BigDecimal notional =
-            request.getQuoteAmount() != null && request.getQuoteAmount().compareTo(BigDecimal.ZERO) > 0
-                ? request.getQuoteAmount()
-                : request.getQuantity() != null && lastPrice != null
-                    ? request.getQuantity().multiply(lastPrice)
-                    : null;
+          result.plan().getClass().getSimpleName(),
+          result.executedQty(),
+          result.averagePrice(),
+          tradingProps.isDryRun());
+      if (!tradingProps.isDryRun() && result.executedQty().compareTo(BigDecimal.ZERO) > 0) {
+        BigDecimal notional = result.averagePrice().multiply(result.executedQty());
         riskGuard.onTrade(new TradeEvent(symbol, true, BigDecimal.ZERO, null, notional));
-      }
-      if (response.executedQty() != null && response.executedQty().compareTo(BigDecimal.ZERO) > 0) {
-        tcaService.recordFill(response.clientOrderId(), response.price(), null, response.transactTime());
-      }
-      if (!request.isDryRun()) {
+        String lastClientOrderId =
+            result.orders().isEmpty()
+                ? request.baseClientOrderId()
+                : result.orders().get(result.orders().size() - 1).clientOrderId();
         positionManager.openPosition(
             new PositionManager.OpenPositionCommand(
                 symbol,
                 orderSide,
-                lastPrice,
-                request.getQuantity(),
+                result.averagePrice(),
+                result.executedQty(),
                 stopPlan.stopLoss(),
                 stopPlan.takeProfit(),
                 null,
-                response.clientOrderId()));
-        shadowEngine.registerShadow(symbol, orderSide, lastPrice, request.getQuantity(), stopPlan);
+                lastClientOrderId));
+        shadowEngine.registerShadow(symbol, orderSide, result.averagePrice(), result.executedQty(), stopPlan);
       }
-      return Optional.of(response);
+      return Optional.of(result);
     } catch (Exception ex) {
       log.error("Failed to execute order for {}: {}", decisionKey, ex.getMessage(), ex);
       return Optional.empty();
     }
+  }
+
+  private Urgency resolveUrgency(double confidence) {
+    if (confidence >= 0.8) {
+      return Urgency.HIGH;
+    }
+    if (confidence <= 0.35) {
+      return Urgency.LOW;
+    }
+    return Urgency.MEDIUM;
+  }
+
+  private double estimateMaxSlippageBps(BigDecimal price, BigDecimal atr) {
+    if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+      return 10.0;
+    }
+    if (atr != null && atr.compareTo(BigDecimal.ZERO) > 0) {
+      return atr.divide(price, 8, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(10000)).doubleValue();
+    }
+    return 10.0;
+  }
+
+  private double estimateSpreadBps(ExchangeInfo exchangeInfo, BigDecimal price) {
+    if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+      return 5.0;
+    }
+    return exchangeInfo
+        .tickSize()
+        .divide(price, 8, RoundingMode.HALF_UP)
+        .multiply(BigDecimal.valueOf(10000))
+        .doubleValue();
+  }
+
+  private double estimateVolatilityBps(BigDecimal atr, BigDecimal price) {
+    if (atr == null || price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+      return 0.0;
+    }
+    return atr.divide(price, 8, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(10000)).doubleValue();
+  }
+
+  private BigDecimal estimateBarVolume(BigDecimal volume24h) {
+    if (volume24h == null) {
+      return BigDecimal.ZERO;
+    }
+    return volume24h.divide(BigDecimal.valueOf(1440), 8, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal estimateQuoteBarVolume(BigDecimal volume24h, BigDecimal price) {
+    BigDecimal barVolume = estimateBarVolume(volume24h);
+    if (price == null) {
+      return BigDecimal.ZERO;
+    }
+    return barVolume.multiply(price);
   }
 
   private String newClientOrderId(String symbol, String interval, long closeTime) {

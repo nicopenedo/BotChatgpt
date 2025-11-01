@@ -23,6 +23,7 @@ public class OrderRequest {
 
   private boolean dryRun;
   private String clientOrderId;
+  private String timeInForce;
 
   public String getSymbol() {
     return symbol;
@@ -86,5 +87,13 @@ public class OrderRequest {
 
   public void setClientOrderId(String clientOrderId) {
     this.clientOrderId = clientOrderId;
+  }
+
+  public String getTimeInForce() {
+    return timeInForce;
+  }
+
+  public void setTimeInForce(String timeInForce) {
+    this.timeInForce = timeInForce;
   }
 }

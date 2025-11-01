@@ -3,7 +3,6 @@ package com.bottrading.executor;
 import com.bottrading.config.TradingProps;
 import com.bottrading.config.TradingProps.Mode;
 import com.bottrading.model.dto.Kline;
-import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.repository.DecisionRepository;
 import com.bottrading.service.OrderExecutionService;
 import com.bottrading.service.StrategyService;
@@ -253,7 +252,7 @@ public class TradingScheduler {
       return;
     }
 
-    Optional<OrderResponse> response =
+    Optional<com.bottrading.execution.ExecutionEngine.ExecutionResult> response =
         orderExecutionService.execute(
             context.decisionKey(),
             context.symbol(),
@@ -263,7 +262,10 @@ public class TradingScheduler {
             gateResult.sizingMultiplier());
     if (response.isPresent()) {
       record.executed(true);
-      record.orderId(response.get().orderId());
+      var orders = response.get().orders();
+      if (!orders.isEmpty()) {
+        record.orderId(orders.get(orders.size() - 1).orderId());
+      }
       persistDecision(record);
       registerOrder(signal.side());
       incrementDecisionMetric(signal.side() == SignalSide.BUY ? "BUY" : "SELL", context.source());
