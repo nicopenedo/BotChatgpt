@@ -48,6 +48,7 @@ public class ExecutionEngine {
   private final MeterRegistry meterRegistry;
   private final Clock clock;
   private final DistributionSummary queueTimes;
+  private final DistributionSummary limitTtl;
   private final ConcurrentMap<String, RunningAverage> slippageAvg = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AtomicReference<Double>> povGauge = new ConcurrentHashMap<>();
   private final AnomalyDetector anomalyDetector;
@@ -71,6 +72,12 @@ public class ExecutionEngine {
     this.anomalyDetector = anomalyDetector;
     this.queueTimes =
         DistributionSummary.builder("exec.queueTime.ms").publishPercentileHistogram().register(meterRegistry);
+    this.limitTtl =
+        DistributionSummary.builder("exec.limit.ttl.ms")
+            .baseUnit("milliseconds")
+            .description("Configured TTL before a limit order is replaced")
+            .register(meterRegistry);
+    this.limitTtl.record(0);
   }
 
   public ExecutionResult execute(ExecutionRequest request, MarketSnapshot snapshot) {
@@ -135,6 +142,7 @@ public class ExecutionEngine {
         break;
       }
       sleep(plan.ttlMs());
+      limitTtl.record(plan.ttlMs());
       safeCancel(request.symbol(), clientOrderId);
       meterRegistry.counter("exec.limit.replaces", Tags.of("symbol", request.symbol())).increment();
     }

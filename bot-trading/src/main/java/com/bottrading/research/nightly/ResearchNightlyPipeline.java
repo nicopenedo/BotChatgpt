@@ -26,6 +26,8 @@ import com.bottrading.service.preset.PresetService;
 import com.bottrading.service.preset.PresetService.BacktestMetadata;
 import com.bottrading.service.preset.PresetService.PresetImportRequest;
 import com.bottrading.service.snapshot.SnapshotService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +44,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -62,6 +67,9 @@ public class ResearchNightlyPipeline {
   private final CanaryStageService canaryStageService;
   private final TelegramNotifier notifier;
   private final Clock clock;
+  private final MeterRegistry meterRegistry;
+  private final ConcurrentMap<String, Timer> stageTimers = new ConcurrentHashMap<>();
+  private final AtomicReference<Double> lastDurationSeconds = new AtomicReference<>(0.0);
 
   public ResearchNightlyPipeline(
       ResearchProperties properties,
@@ -74,7 +82,8 @@ public class ResearchNightlyPipeline {
       SnapshotService snapshotService,
       CanaryStageService canaryStageService,
       TelegramNotifier notifier,
-      Optional<Clock> clock) {
+      Optional<Clock> clock,
+      MeterRegistry meterRegistry) {
     this.properties = properties;
     this.backtestEngine = backtestEngine;
     this.dataLoader = dataLoader;
@@ -86,6 +95,8 @@ public class ResearchNightlyPipeline {
     this.canaryStageService = canaryStageService;
     this.notifier = notifier;
     this.clock = clock.orElse(Clock.systemUTC());
+    this.meterRegistry = meterRegistry;
+    meterRegistry.gauge("research.nightly.last_duration.seconds", lastDurationSeconds, AtomicReference::get);
   }
 
   public void runNightly() {
@@ -94,11 +105,16 @@ public class ResearchNightlyPipeline {
       log.debug("Nightly research disabled");
       return;
     }
+    Instant runStart = Instant.now(clock);
+    Timer.Sample totalSample = Timer.start(clock);
     try {
       executeNightly(nightly);
     } catch (Exception ex) {
       log.error("Nightly research pipeline failed", ex);
       notify("Nightly research failed: " + ex.getMessage());
+    } finally {
+      totalSample.stop(stageTimer("total"));
+      recordRunDuration(runStart);
     }
   }
 
@@ -110,10 +126,15 @@ public class ResearchNightlyPipeline {
     String symbol = dataset.getSymbol();
     String interval = dataset.getInterval();
     log.info("Nightly research start symbol={} interval={} from={} to={}", symbol, interval, from, to);
+    incrementNightlyRuns(symbol, interval);
 
+    Timer.Sample loadSample = Timer.start(clock);
     List<com.bottrading.model.dto.Kline> klines =
         dataLoader.load(symbol, interval, from, to, dataset.isUseCache());
+    loadSample.stop(stageTimer("load_data"));
+    Timer.Sample labelSample = Timer.start(clock);
     List<RegimeLabel> labels = regimeLabeler.label(symbol, interval, klines);
+    labelSample.stop(stageTimer("label_regime"));
     RegimeLabelSet labelSet = new RegimeLabelSet(labels);
     String labelsHash = hashLabels(labels);
 
@@ -133,7 +154,9 @@ public class ResearchNightlyPipeline {
       }
     }
 
+    Timer.Sample canaryEval = Timer.start(clock);
     var updates = canaryStageService.evaluatePending(nightly);
+    canaryEval.stop(stageTimer("canary_eval"));
     for (CanaryStageService.StageUpdate update : updates) {
       notify(
           "Canary update preset="
@@ -188,6 +211,7 @@ public class ResearchNightlyPipeline {
             filter,
             null);
 
+    Timer.Sample splitSample = Timer.start(clock);
     List<BacktestRequest> windows =
         WalkForwardOptimizer.splitByRegime(
             baseRequest,
@@ -196,6 +220,7 @@ public class ResearchNightlyPipeline {
             ga.getTestDays(),
             filter,
             ga.getMinSamples());
+    splitSample.stop(stageTimer("window_split"));
     if (windows.isEmpty()) {
       log.info("No valid walk-forward windows for regime {}", trend);
       return;
@@ -205,6 +230,7 @@ public class ResearchNightlyPipeline {
     List<WindowMetrics> windowMetrics = new ArrayList<>();
     Map<String, Object> perSplitMetrics = new LinkedHashMap<>();
 
+    Timer.Sample gaSample = Timer.start(clock);
     for (BacktestRequest window : windows) {
       Evaluator evaluator =
           new Evaluator(
@@ -224,32 +250,42 @@ public class ResearchNightlyPipeline {
         champion = candidate;
       }
     }
+    gaSample.stop(stageTimer("ga_training"));
 
     if (champion == null) {
       log.warn("GA returned no champion for regime {}", trend);
       return;
     }
 
+    Timer.Sample oosSample = Timer.start(clock);
     BacktestResult result = backtestEngine.run(baseRequest, regimeDir, champion.toStrategy());
+    oosSample.stop(stageTimer("backtest_oos"));
     reportWriter.write(regimeDir, result);
     Map<String, Object> oosMetrics = toMetricsMap(result.metrics());
 
+    Timer.Sample gateSample = Timer.start(clock);
     PromotionGate.GateDecision gateDecision =
         PromotionGate.evaluateOos(result.metrics(), gate, gate.getPfBaseline());
+    gateSample.stop(stageTimer("gate_evaluation"));
 
     Map<String, Object> shadowMetrics = Map.of();
     String status = gateDecision.approved() ? "eligible" : "rejected";
     String note = gateDecision.approved() ? "" : gateDecision.reason();
 
+    Timer.Sample reportSample = Timer.start(clock);
     ReportData reportData =
         new ReportData(runId, symbol, trend, status, note, oosMetrics, shadowMetrics, windowMetrics, regimeDir);
     reportGenerator.generate(reportData);
+    reportSample.stop(stageTimer("report_generation"));
 
     if (!gateDecision.approved()) {
       log.info("Regime {} rejected by gate: {}", trend, gateDecision.reason());
       notify("Nightly " + trend + " rejected: " + gateDecision.reason());
+      recordCandidate(trend, "rejected");
       return;
     }
+
+    recordCandidate(trend, "eligible");
 
     Map<String, Object> paramsJson = genomeToParams(champion, runId);
     Map<String, Object> signalsJson = genomeToSignals(champion);
@@ -283,12 +319,18 @@ public class ResearchNightlyPipeline {
             result.dataHash(),
             labelsHash);
 
+    Timer.Sample importSample = Timer.start(clock);
     PresetVersion preset = presetService.importPreset(request);
+    importSample.stop(stageTimer("preset_import"));
+    Timer.Sample snapshotSample = Timer.start(clock);
     snapshotService.createSnapshot(
         preset.getId(), SnapshotWindow.CUSTOM, oosMetrics, Map.of(), Map.of());
+    snapshotSample.stop(stageTimer("snapshot"));
     MetricsSummary metrics = result.metrics();
     double pf = metrics.profitFactor() != null ? metrics.profitFactor().doubleValue() : 0.0d;
+    Timer.Sample canaryInit = Timer.start(clock);
     canaryStageService.initializeState(preset, symbol, runId, pf, metrics.trades());
+    canaryInit.stop(stageTimer("canary_init"));
     notify(
         "Nightly regime "
             + trend
@@ -296,6 +338,34 @@ public class ResearchNightlyPipeline {
             + preset.getId()
             + " PF="
             + pf);
+  }
+
+  private void incrementNightlyRuns(String symbol, String interval) {
+    meterRegistry
+        .counter("research.nightly.runs", "symbol", symbol, "interval", interval)
+        .increment();
+  }
+
+  private void recordCandidate(RegimeTrend trend, String status) {
+    meterRegistry
+        .counter("research.nightly.candidates", "trend", trend.name().toLowerCase(), "status", status)
+        .increment();
+  }
+
+  private Timer stageTimer(String stage) {
+    return stageTimers.computeIfAbsent(
+        stage,
+        key ->
+            Timer.builder("research.nightly.stage.duration")
+                .description("Nightly research stage duration")
+                .tag("stage", key)
+                .publishPercentileHistogram()
+                .register(meterRegistry));
+  }
+
+  private void recordRunDuration(Instant start) {
+    double seconds = Duration.between(start, Instant.now(clock)).toMillis() / 1000.0;
+    lastDurationSeconds.set(seconds);
   }
 
   private Map<String, Object> genomeToParams(Genome genome, String presetKey) {

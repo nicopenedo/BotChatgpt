@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -38,6 +39,7 @@ public class AnomalyDetector {
   private final Clock clock;
   private final ConcurrentMap<MetricKey, RollingWindow> windows = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, SymbolState> states = new ConcurrentHashMap<>();
+  private final ConcurrentMap<MetricKey, AtomicReference<Double>> metricGauges = new ConcurrentHashMap<>();
 
   public AnomalyDetector(
       AnomalyProperties properties,
@@ -117,6 +119,19 @@ public class AnomalyDetector {
     RollingWindow window =
         windows.computeIfAbsent(key, ignored -> new RollingWindow(properties.getWindow()));
     Instant now = Instant.now(clock);
+    AtomicReference<Double> gauge =
+        metricGauges.computeIfAbsent(
+            key,
+            ignored -> {
+              AtomicReference<Double> ref = new AtomicReference<>(0.0);
+              meterRegistry.gauge(
+                  "anomaly.metric",
+                  Tags.of("symbol", symbol, "metric", metric.id()),
+                  ref,
+                  AtomicReference::get);
+              return ref;
+            });
+    gauge.set(value);
     Stats stats = window.add(value);
     SymbolState state = states.computeIfAbsent(symbol, this::newSymbolState);
     state.append(metric, value);

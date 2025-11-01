@@ -1,5 +1,7 @@
 package com.bottrading.service.binance;
 
+import com.binance.connector.client.exceptions.BinanceClientException;
+import com.binance.connector.client.exceptions.BinanceServerException;
 import com.binance.connector.client.impl.SpotClientImpl;
 import com.bottrading.chaos.ChaosSuite;
 import com.bottrading.config.BinanceProperties;
@@ -20,6 +22,10 @@ import com.bottrading.util.OrderValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,6 +34,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -46,17 +55,35 @@ public class BinanceClientImpl implements BinanceClient {
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final Throttle throttle;
   private final ChaosSuite chaosSuite;
+  private final MeterRegistry meterRegistry;
+  private final ConcurrentMap<String, Counter> apiCounters = new ConcurrentHashMap<>();
+  private final ConcurrentMap<Endpoint, Timer> latencyTimers = new ConcurrentHashMap<>();
 
   public BinanceClientImpl(
       BinanceProperties properties,
       CacheManager cacheManager,
       Throttle throttle,
-      ChaosSuite chaosSuite) {
+      ChaosSuite chaosSuite,
+      MeterRegistry meterRegistry) {
     this.spotClient =
         new SpotClientImpl(properties.apiKey(), properties.apiSecret(), properties.baseUrl());
     this.cacheManager = cacheManager;
     this.throttle = throttle;
     this.chaosSuite = chaosSuite;
+    this.meterRegistry = meterRegistry;
+    for (Endpoint endpoint : Endpoint.values()) {
+      latencyTimers.computeIfAbsent(
+          endpoint,
+          key ->
+              Timer.builder("binance.api.latency")
+                  .description("Latency of Binance REST calls")
+                  .tag("endpoint", key.name().toLowerCase())
+                  .publishPercentileHistogram()
+                  .register(meterRegistry));
+      for (String status : List.of("success", "rate_limited", "server_error", "error")) {
+        counterFor(endpoint, status).increment(0);
+      }
+    }
   }
 
   @Override
@@ -291,11 +318,68 @@ public class BinanceClientImpl implements BinanceClient {
 
   private <T> T execute(Endpoint endpoint, String symbol, Supplier<T> supplier) {
     Supplier<T> decorated = chaosSuite.decorateApiCall(supplier);
+    Supplier<T> instrumented =
+        () -> {
+          long started = System.nanoTime();
+          try {
+            T result = decorated.get();
+            recordSuccess(endpoint, System.nanoTime() - started);
+            return result;
+          } catch (RuntimeException ex) {
+            recordFailure(endpoint, System.nanoTime() - started, ex);
+            throw ex;
+          }
+        };
     try {
-      return throttle.submit(endpoint, symbol, decorated).toCompletableFuture().join();
+      return throttle.submit(endpoint, symbol, instrumented).toCompletableFuture().join();
     } catch (CompletionException | CancellationException ex) {
       throw propagate(ex);
     }
+  }
+
+  private void recordSuccess(Endpoint endpoint, long nanos) {
+    counterFor(endpoint, "success").increment();
+    timerFor(endpoint).record(nanos, TimeUnit.NANOSECONDS);
+  }
+
+  private void recordFailure(Endpoint endpoint, long nanos, RuntimeException ex) {
+    String status = classify(ex);
+    counterFor(endpoint, status).increment();
+    timerFor(endpoint).record(nanos, TimeUnit.NANOSECONDS);
+  }
+
+  private String classify(RuntimeException ex) {
+    Throwable cause = ex;
+    if (ex.getCause() instanceof RuntimeException runtime) {
+      cause = runtime;
+    }
+    if (cause instanceof BinanceClientException client) {
+      int status = client.getHttpStatusCode();
+      if (status == 429 || status == 418) {
+        return "rate_limited";
+      }
+      if (status >= 500) {
+        return "server_error";
+      }
+      return "error";
+    }
+    if (cause instanceof BinanceServerException server && server.getHttpStatusCode() >= 500) {
+      return "server_error";
+    }
+    return "error";
+  }
+
+  private Counter counterFor(Endpoint endpoint, String status) {
+    String key = endpoint.name() + "|" + status;
+    return apiCounters.computeIfAbsent(
+        key,
+        ignored ->
+            meterRegistry.counter(
+                "binance.api.requests", Tags.of("endpoint", endpoint.name().toLowerCase(), "status", status)));
+  }
+
+  private Timer timerFor(Endpoint endpoint) {
+    return latencyTimers.get(endpoint);
   }
 
   private RuntimeException propagate(Throwable throwable) {
