@@ -9,6 +9,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -29,7 +30,11 @@ public class PositionEntity {
   @Column(name = "entry_price")
   private BigDecimal entryPrice;
 
-  private BigDecimal quantity;
+  @Column(name = "qty_init")
+  private BigDecimal qtyInit;
+
+  @Column(name = "qty_remaining")
+  private BigDecimal qtyRemaining;
 
   @Column(name = "stop_loss")
   private BigDecimal stopLoss;
@@ -37,23 +42,12 @@ public class PositionEntity {
   @Column(name = "take_profit")
   private BigDecimal takeProfit;
 
-  @Column(name = "trailing_stop")
-  private BigDecimal trailingStop;
-
-  @Column(name = "trailing_offset")
-  private BigDecimal trailingOffset;
-
-  @Column(name = "breakeven_price")
-  private BigDecimal breakevenPrice;
-
-  @Column(name = "oco_group_id")
-  private String ocoGroupId;
-
-  @Column(name = "entry_atr")
-  private BigDecimal entryAtr;
+  @Lob
+  @Column(name = "trailing_conf")
+  private String trailingConf;
 
   @Enumerated(EnumType.STRING)
-  private PositionStatus status = PositionStatus.OPEN;
+  private PositionStatus status = PositionStatus.OPENING;
 
   @Column(name = "opened_at")
   private Instant openedAt;
@@ -61,8 +55,11 @@ public class PositionEntity {
   @Column(name = "closed_at")
   private Instant closedAt;
 
-  @Column(name = "last_adjustment_at")
-  private Instant lastAdjustmentAt;
+  @Column(name = "last_update_at")
+  private Instant lastUpdateAt;
+
+  @Column(name = "correlation_id")
+  private String correlationId;
 
   public Long getId() {
     return id;
@@ -96,12 +93,20 @@ public class PositionEntity {
     this.entryPrice = entryPrice;
   }
 
-  public BigDecimal getQuantity() {
-    return quantity;
+  public BigDecimal getQtyInit() {
+    return qtyInit;
   }
 
-  public void setQuantity(BigDecimal quantity) {
-    this.quantity = quantity;
+  public void setQtyInit(BigDecimal qtyInit) {
+    this.qtyInit = qtyInit;
+  }
+
+  public BigDecimal getQtyRemaining() {
+    return qtyRemaining;
+  }
+
+  public void setQtyRemaining(BigDecimal qtyRemaining) {
+    this.qtyRemaining = qtyRemaining;
   }
 
   public BigDecimal getStopLoss() {
@@ -120,44 +125,12 @@ public class PositionEntity {
     this.takeProfit = takeProfit;
   }
 
-  public BigDecimal getTrailingStop() {
-    return trailingStop;
+  public String getTrailingConf() {
+    return trailingConf;
   }
 
-  public void setTrailingStop(BigDecimal trailingStop) {
-    this.trailingStop = trailingStop;
-  }
-
-  public BigDecimal getTrailingOffset() {
-    return trailingOffset;
-  }
-
-  public void setTrailingOffset(BigDecimal trailingOffset) {
-    this.trailingOffset = trailingOffset;
-  }
-
-  public BigDecimal getBreakevenPrice() {
-    return breakevenPrice;
-  }
-
-  public void setBreakevenPrice(BigDecimal breakevenPrice) {
-    this.breakevenPrice = breakevenPrice;
-  }
-
-  public String getOcoGroupId() {
-    return ocoGroupId;
-  }
-
-  public void setOcoGroupId(String ocoGroupId) {
-    this.ocoGroupId = ocoGroupId;
-  }
-
-  public BigDecimal getEntryAtr() {
-    return entryAtr;
-  }
-
-  public void setEntryAtr(BigDecimal entryAtr) {
-    this.entryAtr = entryAtr;
+  public void setTrailingConf(String trailingConf) {
+    this.trailingConf = trailingConf;
   }
 
   public PositionStatus getStatus() {
@@ -184,11 +157,19 @@ public class PositionEntity {
     this.closedAt = closedAt;
   }
 
-  public Instant getLastAdjustmentAt() {
-    return lastAdjustmentAt;
+  public Instant getLastUpdateAt() {
+    return lastUpdateAt;
   }
 
-  public void setLastAdjustmentAt(Instant lastAdjustmentAt) {
-    this.lastAdjustmentAt = lastAdjustmentAt;
+  public void setLastUpdateAt(Instant lastUpdateAt) {
+    this.lastUpdateAt = lastUpdateAt;
+  }
+
+  public String getCorrelationId() {
+    return correlationId;
+  }
+
+  public void setCorrelationId(String correlationId) {
+    this.correlationId = correlationId;
   }
 }

@@ -84,6 +84,10 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/admin/scheduler/status` | `ADMIN` | Devuelve modo (`ws`/`polling`), última `decisionKey`, flags y cooldown restante. |
 | GET | `/admin/live-enabled` | `ADMIN` | Consulta estado `liveEnabled`. |
 | GET | `/api/strategy/decide?symbol=BTCUSDT` | `READ` | Evalúa la estrategia compuesta y devuelve `side`, `confidence` y notas. |
+| GET | `/api/positions/open` | `READ` | Lista posiciones abiertas paginadas. |
+| GET | `/api/positions/{id}` | `READ` | Recupera el detalle de una posición. |
+| POST | `/admin/positions/{id}/close` | `ADMIN` | Cierra una posición y cancela órdenes gestionadas. |
+| POST | `/admin/reconcile` | `ADMIN` | Fuerza reconciliación contra Binance. |
 
 ## Señales & Estrategia
 - Las señales técnicas viven en `src/main/java/com/bottrading/strategy/signals/` e incluyen SMA/EMA crossover, MACD, RSI con filtro de tendencia, Bollinger Bands, Supertrend, Donchian, Stochastic, VWAP, filtros ATR/ADX/volumen 24h y más.
@@ -152,19 +156,34 @@ Chart base en `k8s/` con Deployment y Service listos para extender.
 ## Licencia
 MIT.
 
-## Stop Engine & OCO
-El `StopEngine` administra automáticamente `stop loss`, `take profit`, trailing y movimientos a breakeven para cada posición viva. Se puede operar en modo porcentaje o ATR y soporta emulación de OCO cuando Binance Spot no ofrece el endpoint. 
+## Gestión de posiciones y OCO híbrido
+- `PositionManager` centraliza el ciclo de vida `OPENING → OPEN → CLOSING → CLOSED` con locks por posición e idempotencia sobre cada evento de fill.
+- Crea siempre el par SL/TP y primero intenta emitir un **OCO nativo** (`BinanceClient.placeOcoOrder`). Si el exchange responde que no está soportado se activa la **emulación lado cliente**: se levantan órdenes independientes y, ante un fill, se fuerza la cancelación del opuesto con reintentos (`oco.corrections`).
+- Persistencia en `positions`, `managed_orders` y `trades`, métricas `positions.opened`, `positions.closed`, `orders.partial`, `orders.filled`, `orders.canceled` y notificaciones `notifyPositionOpened`, `notifyTakeProfit`, `notifyStopHit`, `notifyOcoCorrected`.
+- `POST /admin/positions/{id}/close` permite forzar el cierre de una posición (cancela pendientes, marca `CLOSED`). `GET /api/positions/open` y `GET /api/positions/{id}` exponen el estado actual.
 
-- Configuración por símbolo vía `POST /api/stop/config` (requiere rol `ADMIN`).
-- Consulta de estado con `GET /api/stop/status?symbol=BTCUSDT`.
-- Persistencia en tablas `positions` y `managed_orders` incluyendo trailing/oco/breakeven.
-- Métricas: `stop.sl.hits`, `stop.tp.hits`, `stop.trailing.adjustments`, `stop.breakeven.moves`.
+## Listeners de fills (userDataStream)
+- `UserDataStreamService` mantiene el `listenKey`, renueva cada `binance.userdatastream.keepalive-minutes` y traduce los `executionReport` a `ManagedOrderUpdate` consumidos por el `PositionManager`.
+- Si el cliente Binance lanza `UnsupportedOperationException` (p. ej. en entornos de prueba) el servicio degrada a modo noop pero expone `dispatch(...)` para inyectar eventos en tests.
+- Toda reconexión/keep-alive fallido queda logueada y dispara `notifyError`/`notifyOcoCorrected` según corresponda.
 
-Ejemplo de sizing percentil (BUY):
+## Reconciliación al arranque
+- `ExchangeReconciler` consulta órdenes abiertas recientes (`BinanceClient.getOpenOrders/getRecentOrders`), las convierte en `ExternalOrderSnapshot` y llama a `positionManager.reconcile(...)` para alinear el estado local.
+- Propiedades claves: `reconcile.on-startup`, `reconcile.scan-minutes`, `positions.lock-timeout-ms`.
+- Endpoint `POST /admin/reconcile` ejecuta una reconciliación manual sobre todos los símbolos abiertos y deja trazabilidad vía `notifyReconciledItem`.
+
+## Parciales y trailing
+- Un fill parcial (`PARTIAL`) reduce `qtyRemaining` de la posición y ajusta el tamaño de la orden opuesta para mantener el vínculo OCO lógico. Al llegar a `FILLED` se registra el trade y se cancela el opuesto.
+- `StopEngine` se enfoca en calcular planes SL/TP/trailing/breakeven; los ajustes dinámicos (breakeven y trailing) siguen corriendo a través de los eventos de precio y de fills.
+- Cuando la cantidad remanente cae por debajo del `stepSize` efectivo se marca la posición como cerrada y se limpian órdenes pendientes.
+
+### Comandos de ejemplo
+```bash
+# Forzar reconciliación manual
+curl -X POST -u admin:*** http://localhost:8080/admin/reconcile
+# Cerrar una posición a mercado
+curl -X POST -u admin:*** http://localhost:8080/admin/positions/123/close
 ```
-qty = (equity * (riskPct / 100)) / (entryPrice - stopLoss)
-```
-El motor mantiene las órdenes sincronizadas y cancela el extremo opuesto cuando una pata del OCO se ejecuta.
 
 ## Sizing por riesgo
 `OrderSizingService` calcula el tamaño de posición dinámico en función del riesgo por trade configurado (`trading.risk-per-trade-pct`), la distancia al stop y las restricciones de `stepSize`/`minNotional`.

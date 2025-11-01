@@ -4,6 +4,7 @@ import com.bottrading.config.TradingProps;
 import com.bottrading.model.dto.AccountBalancesResponse;
 import com.bottrading.execution.OrderSizingService;
 import com.bottrading.execution.OrderSizingService.OrderSizingResult;
+import com.bottrading.execution.PositionManager;
 import com.bottrading.execution.StopEngine;
 import com.bottrading.execution.StopEngine.StopPlan;
 import com.bottrading.model.dto.ExchangeInfo;
@@ -41,6 +42,7 @@ public class OrderExecutionService {
   private final MeterRegistry meterRegistry;
   private final OrderSizingService orderSizingService;
   private final StopEngine stopEngine;
+  private final PositionManager positionManager;
   private final ShadowEngine shadowEngine;
 
   public OrderExecutionService(
@@ -51,6 +53,7 @@ public class OrderExecutionService {
       MeterRegistry meterRegistry,
       OrderSizingService orderSizingService,
       StopEngine stopEngine,
+      PositionManager positionManager,
       ShadowEngine shadowEngine) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
@@ -59,6 +62,7 @@ public class OrderExecutionService {
     this.meterRegistry = meterRegistry;
     this.orderSizingService = orderSizingService;
     this.stopEngine = stopEngine;
+    this.positionManager = positionManager;
     this.shadowEngine = shadowEngine;
   }
 
@@ -136,8 +140,16 @@ public class OrderExecutionService {
           response.status(),
           request.isDryRun());
       if (!request.isDryRun()) {
-        stopEngine.registerPosition(
-            symbol, orderSide, lastPrice, request.getQuantity(), null, response.clientOrderId());
+        positionManager.openPosition(
+            new PositionManager.OpenPositionCommand(
+                symbol,
+                orderSide,
+                lastPrice,
+                request.getQuantity(),
+                stopPlan.stopLoss(),
+                stopPlan.takeProfit(),
+                null,
+                response.clientOrderId()));
         shadowEngine.registerShadow(symbol, orderSide, lastPrice, request.getQuantity(), stopPlan);
       }
       return Optional.of(response);

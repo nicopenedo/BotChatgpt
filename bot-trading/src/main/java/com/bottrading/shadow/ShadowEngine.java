@@ -82,18 +82,18 @@ public class ShadowEngine {
       boolean hit = false;
       if (position.getSide() == OrderSide.BUY) {
         if (price.compareTo(position.getStopLoss()) <= 0) {
-          closeShadow(position, price, PositionStatus.STOP_HIT);
+          closeShadow(position, price);
           hit = true;
         } else if (price.compareTo(position.getTakeProfit()) >= 0) {
-          closeShadow(position, price, PositionStatus.TAKE_PROFIT);
+          closeShadow(position, price);
           hit = true;
         }
       } else {
         if (price.compareTo(position.getStopLoss()) >= 0) {
-          closeShadow(position, price, PositionStatus.STOP_HIT);
+          closeShadow(position, price);
           hit = true;
         } else if (price.compareTo(position.getTakeProfit()) <= 0) {
-          closeShadow(position, price, PositionStatus.TAKE_PROFIT);
+          closeShadow(position, price);
           hit = true;
         }
       }
@@ -113,14 +113,11 @@ public class ShadowEngine {
     evaluateDivergence(symbol);
   }
 
-  private void closeShadow(ShadowPositionEntity position, BigDecimal exitPrice, PositionStatus status) {
+  private void closeShadow(ShadowPositionEntity position, BigDecimal exitPrice) {
     position.setExitPrice(exitPrice);
     position.setClosedAt(Instant.now(clock));
-    position.setStatus(status);
-    BigDecimal pnl =
-        (status == PositionStatus.TAKE_PROFIT)
-            ? exitPrice.subtract(position.getEntryPrice())
-            : exitPrice.subtract(position.getEntryPrice());
+    position.setStatus(PositionStatus.CLOSED);
+    BigDecimal pnl = exitPrice.subtract(position.getEntryPrice());
     if (position.getSide() == OrderSide.SELL) {
       pnl = pnl.negate();
     }
