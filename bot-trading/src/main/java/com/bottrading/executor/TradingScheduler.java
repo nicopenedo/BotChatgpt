@@ -16,6 +16,8 @@ import com.bottrading.service.trading.AllocatorService.AllocationDecision;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyDecision;
+import com.bottrading.throttle.Endpoint;
+import com.bottrading.throttle.Throttle;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -66,6 +68,7 @@ public class TradingScheduler {
   private final HealthService healthService;
   private final Clock clock;
   private final Timer decisionTimer;
+  private final Throttle throttle;
 
   private final Lock executionLock = new ReentrantLock();
   private final AtomicBoolean enabled = new AtomicBoolean(true);
@@ -86,7 +89,8 @@ public class TradingScheduler {
       AllocatorService allocatorService,
       DriftWatchdog driftWatchdog,
       HealthService healthService,
-      ObjectProvider<Clock> clockProvider) {
+      ObjectProvider<Clock> clockProvider,
+      Throttle throttle) {
     this.tradingProps = tradingProps;
     this.strategyService = strategyService;
     this.tradingState = tradingState;
@@ -100,6 +104,7 @@ public class TradingScheduler {
     this.driftWatchdog = driftWatchdog;
     this.healthService = healthService;
     this.clock = Objects.requireNonNullElse(clockProvider.getIfAvailable(), Clock.systemUTC());
+    this.throttle = Objects.requireNonNull(throttle, "throttle");
     this.decisionTimer =
         Timer.builder("scheduler.candle.duration.ms")
             .publishPercentileHistogram()
@@ -164,6 +169,9 @@ public class TradingScheduler {
         continue;
       }
       try {
+        if (!throttle.canSchedule(Endpoint.KLINES, symbol)) {
+          continue;
+        }
         long start = System.nanoTime();
         List<Kline> klines = binanceClient.getKlines(symbol, tradingProps.getInterval(), 2);
         long latencyMs = (System.nanoTime() - start) / 1_000_000;

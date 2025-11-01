@@ -12,23 +12,21 @@ import com.bottrading.model.dto.PriceTicker;
 import com.bottrading.model.entity.ManagedOrderEntity;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.throttle.Endpoint;
+import com.bottrading.throttle.Throttle;
 import com.bottrading.util.IdGenerator;
 import com.bottrading.util.OrderValidator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.resilience4j.ratelimiter.RateLimiter;
-import io.github.resilience4j.ratelimiter.RateLimiterConfig;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -45,25 +43,25 @@ public class BinanceClientImpl implements BinanceClient {
   private final SpotClientImpl spotClient;
   private final CacheManager cacheManager;
   private final ObjectMapper objectMapper = new ObjectMapper();
-  private final Retry retry;
-  private final RateLimiter rateLimiter;
+  private final Throttle throttle;
 
   public BinanceClientImpl(
       BinanceProperties properties,
       CacheManager cacheManager,
-      RetryConfig retryConfig,
-      RateLimiterConfig rateLimiterConfig) {
+      Throttle throttle) {
     this.spotClient =
         new SpotClientImpl(properties.apiKey(), properties.apiSecret(), properties.baseUrl());
     this.cacheManager = cacheManager;
-    RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
-    this.retry = retryRegistry.retry("binance");
-    this.rateLimiter = RateLimiter.of("binance", rateLimiterConfig);
+    this.throttle = throttle;
   }
 
   @Override
   public PriceTicker getPrice(String symbol) {
-    String response = execute(() -> spotClient.createMarket().tickerPrice(Map.of("symbol", symbol)));
+    String response =
+        execute(
+            Endpoint.PRICE_TICKER,
+            symbol,
+            () -> spotClient.createMarket().tickerPrice(Map.of("symbol", symbol)));
     JsonNode node = readTree(response);
     return new PriceTicker(symbol, new BigDecimal(node.get("price").asText()));
   }
@@ -74,7 +72,8 @@ public class BinanceClientImpl implements BinanceClient {
     params.put("symbol", symbol);
     params.put("interval", interval);
     params.put("limit", limit);
-    String response = execute(() -> spotClient.createMarket().klines(params));
+    String response =
+        execute(Endpoint.KLINES, symbol, () -> spotClient.createMarket().klines(params));
     JsonNode array = readTree(response);
     List<Kline> klines = new ArrayList<>();
     for (JsonNode kline : array) {
@@ -94,7 +93,10 @@ public class BinanceClientImpl implements BinanceClient {
   @Override
   public BigDecimal get24hQuoteVolume(String symbol) {
     String response =
-        execute(() -> spotClient.createMarket().ticker24H(Map.of("symbol", symbol)));
+        execute(
+            Endpoint.TICKER_24H,
+            symbol,
+            () -> spotClient.createMarket().ticker24H(Map.of("symbol", symbol)));
     JsonNode node = readTree(response);
     return new BigDecimal(node.get("quoteVolume").asText());
   }
@@ -106,7 +108,11 @@ public class BinanceClientImpl implements BinanceClient {
     if (cached != null) {
       return cached;
     }
-    String response = execute(() -> spotClient.createMarket().exchangeInfo(Map.of("symbol", symbol)));
+    String response =
+        execute(
+            Endpoint.EXCHANGE_INFO,
+            symbol,
+            () -> spotClient.createMarket().exchangeInfo(Map.of("symbol", symbol)));
     JsonNode root = readTree(response);
     JsonNode symbolNode = root.path("symbols").get(0);
     BigDecimal tickSize = BigDecimal.ONE;
@@ -130,7 +136,7 @@ public class BinanceClientImpl implements BinanceClient {
 
   @Override
   public AccountBalancesResponse getAccountBalances(List<String> assets) {
-    String response = execute(() -> spotClient.createTrade().account(new HashMap<>()));
+    String response = execute(Endpoint.ACCOUNT_INFORMATION, null, () -> spotClient.createTrade().account(new HashMap<>()));
     JsonNode node = readTree(response);
     List<AccountBalancesResponse.Balance> balances = new ArrayList<>();
     for (JsonNode balance : node.path("balances")) {
@@ -155,7 +161,8 @@ public class BinanceClientImpl implements BinanceClient {
     }
     Map<String, Object> params = new HashMap<>();
     params.put("symbol", symbol);
-    String response = execute(() -> spotClient.createTrade().commissionRate(params));
+    String response =
+        execute(Endpoint.COMMISSION, symbol, () -> spotClient.createTrade().commissionRate(params));
     JsonNode node = readTree(response);
     BigDecimal maker = new BigDecimal(node.get("makerCommission").asText());
     cache.put(symbol, maker);
@@ -190,7 +197,8 @@ public class BinanceClientImpl implements BinanceClient {
       }
     }
 
-    String response = execute(() -> spotClient.createTrade().newOrder(params));
+    String response =
+        execute(Endpoint.NEW_ORDER, request.getSymbol(), () -> spotClient.createTrade().newOrder(params));
     return mapOrderResponse(response);
   }
 
@@ -199,7 +207,8 @@ public class BinanceClientImpl implements BinanceClient {
     Map<String, Object> params = new HashMap<>();
     params.put("symbol", symbol);
     params.put("orderId", orderId);
-    String response = execute(() -> spotClient.createTrade().getOrder(params));
+    String response =
+        execute(Endpoint.ORDER_STATUS, symbol, () -> spotClient.createTrade().getOrder(params));
     return mapOrderResponse(response);
   }
 
@@ -276,9 +285,24 @@ public class BinanceClientImpl implements BinanceClient {
     }
   }
 
-  private <T> T execute(Supplier<T> supplier) {
-    Supplier<T> decorated = Retry.decorateSupplier(retry, supplier);
-    decorated = RateLimiter.decorateSupplier(rateLimiter, decorated);
-    return decorated.get();
+  private <T> T execute(Endpoint endpoint, String symbol, Supplier<T> supplier) {
+    try {
+      return throttle.submit(endpoint, symbol, supplier).toCompletableFuture().join();
+    } catch (CompletionException | CancellationException ex) {
+      throw propagate(ex);
+    }
+  }
+
+  private RuntimeException propagate(Throwable throwable) {
+    Throwable cause = throwable;
+    if (throwable instanceof CompletionException completion && completion.getCause() != null) {
+      cause = completion.getCause();
+    } else if (throwable instanceof CancellationException cancellation && cancellation.getCause() != null) {
+      cause = cancellation.getCause();
+    }
+    if (cause instanceof RuntimeException runtime) {
+      return runtime;
+    }
+    return new IllegalStateException("Binance call failed", cause);
   }
 }
