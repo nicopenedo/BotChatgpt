@@ -2,6 +2,8 @@ package com.bottrading.strategy.router;
 
 import com.bottrading.config.TradingProps;
 import com.bottrading.research.regime.Regime;
+import com.bottrading.model.enums.OrderSide;
+import com.bottrading.service.preset.PresetService;
 import com.bottrading.strategy.CompositeStrategy;
 import com.bottrading.strategy.StrategyFactory;
 import com.bottrading.strategy.StrategyFactory.RouterRule;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,13 +23,18 @@ public class StrategyRouter {
   private final TradingProps tradingProps;
   private final StrategyFactory strategyFactory;
   private final MeterRegistry meterRegistry;
+  private final PresetService presetService;
   private final Map<String, RouterState> states = new ConcurrentHashMap<>();
 
   public StrategyRouter(
-      TradingProps tradingProps, StrategyFactory strategyFactory, MeterRegistry meterRegistry) {
+      TradingProps tradingProps,
+      StrategyFactory strategyFactory,
+      MeterRegistry meterRegistry,
+      PresetService presetService) {
     this.tradingProps = tradingProps;
     this.strategyFactory = strategyFactory;
     this.meterRegistry = meterRegistry;
+    this.presetService = presetService;
   }
 
   public Selection select(String symbol, Regime regime) {
@@ -35,6 +43,15 @@ public class StrategyRouter {
     String fallback = routerConfig.fallback() != null ? routerConfig.fallback() : catalog.defaultPreset();
     int hysteresis = Math.max(1, routerConfig.hysteresis());
     String target = resolvePreset(catalog, routerConfig.rules(), fallback, regime);
+    if (regime != null) {
+      Optional<String> activePreset =
+          presetService
+              .getActivePreset(regime.trend(), OrderSide.BUY)
+              .map(preset -> deriveStrategyKey(preset.getParamsJson(), target));
+      if (activePreset.isPresent()) {
+        target = activePreset.get();
+      }
+    }
     RouterState state = states.computeIfAbsent(symbol, key -> new RouterState(fallback));
     String preset = state.update(target, hysteresis);
     CompositeStrategy strategy = strategyFactory.getStrategy(preset);
@@ -63,6 +80,17 @@ public class StrategyRouter {
     boolean volMatches =
         rule.volatility() == null || Objects.equals(rule.volatility(), regime.volatility());
     return trendMatches && volMatches;
+  }
+
+  private String deriveStrategyKey(Map<String, Object> params, String fallback) {
+    if (params == null || params.isEmpty()) {
+      return fallback;
+    }
+    Object explicit = params.getOrDefault("presetKey", params.get("strategy"));
+    if (explicit != null) {
+      return explicit.toString();
+    }
+    return fallback;
   }
 
   public record Selection(String preset, CompositeStrategy strategy, Regime regime) {}

@@ -1,0 +1,14 @@
+presets:
+  promotion:
+    epsilon_pf: 0.10
+    maxdd_cap_pct: 8.0
+    min_trades_oos: 150
+    shadow_min_trades: 50
+    shadow_pf_drop_tolerance: 0.15
+    pf_baseline: 1.0
+  canary:
+    stages: [0.5, 0.75, 1.0]
+    stage_window_trades: 30
+  auto-promote: false
+leaderboard:
+  enabled: true
