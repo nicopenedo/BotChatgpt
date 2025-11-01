@@ -85,6 +85,20 @@ La vista `/ui/presets/leaderboard` permite comparar presets por régimen/ventana
 ### Persistencia
 Las migraciones `V7__preset_versioning.sql` y `V8__leaderboard_views.sql` crean las tablas `preset_versions`, `backtest_runs`, `evaluation_snapshots`, `live_tracking` e índices por `regime/side/status`. Los hashes (`code_sha`, `data_hash`, `labels_hash`) habilitan reproducibilidad y auditoría completa.
 
+## Meta-selector online con multi-armed bandits
+
+El motor de decisión incorpora un **meta-selector online** que elige, en cada vela, qué `PresetVersion` ejecutar para la tupla `(symbol, regime, side)` utilizando algoritmos de multi-armed bandits (Thompson Sampling, UCB1 o UCB-Tuned). Cada preset se modela como un **arm** almacenado en `bandit_arm` con sus estadísticas exponencialmente decaídas (`stats_json`) y cada trade/pull se registra en `bandit_pull` junto al contexto (`trend`, `atrPct`, `adx`, `hourOfDay`, `spread/slippage` estimados, etc.).
+
+- **Reward en R-multiple**: `reward = clip(pnlR, ±cap_r) - α·slippage_bps - β·fees_bps` (configurable vía `bandit.reward.*`).
+- **Canary budget**: límites diarios/semanales (`max_trades_per_day`, `max_share_pct_per_day`) para evitar que los candidatos dominen el flujo. El selector degrada a fallback cuando se agota el presupuesto.
+- **Guardas de riesgo**: respeta `RiskGuard`, arms bloqueados y `min_samples_to_compete` antes de permitir que un candidato compita.
+- **Persistencia & rehidratación**: Flyway `V11__bandit_tables.sql` crea las tablas e índices; al reiniciar se recupera el estado sin perder memoria histórica.
+- **Métricas Micrometer**: `bandit.pull.count`, `bandit.reward.avg`, `bandit.canary.share`, `bandit.blocked.count` y `bandit.algorithm` para monitoreo/prometheus.
+- **Configuración**: en `application.yml` (`bandit.enabled`, `bandit.algorithm`, `bandit.decay.half_life_days`, penalizaciones, etc.).
+- **APIs (rol ADMIN)**: `GET /api/bandit/arms`, `POST /api/bandit/arms/{id}/block|unblock`, `POST /api/bandit/reset?confirm=true`, `GET /api/bandit/pulls`, `GET /api/bandit/overview`.
+- **UI**: el dashboard (`/ui/dashboard`) añade el panel **Bandit** con ranking de presets (pulls, reward promedio, CI/UCB) y últimas decisiones con trazabilidad (`decisionId`).
+- **Selector**: `BanditSelector.pickPresetOrFallback(...)` integra con `StrategyService` y devuelve el preset elegido o fallback router; `BanditSelector.update(decisionId, reward)` actualiza el arm al cerrar un trade.
+
 ## Requisitos previos
 - Java 21
 - Maven 3.9+
@@ -163,6 +177,12 @@ mvn -Pprod -Dspring-boot.run.profiles=prod spring-boot:run \
 | GET | `/api/positions/{id}` | `READ` | Recupera el detalle de una posición. |
 | POST | `/admin/positions/{id}/close` | `ADMIN` | Cierra una posición y cancela órdenes gestionadas. |
 | POST | `/admin/reconcile` | `ADMIN` | Fuerza reconciliación contra Binance. |
+| GET | `/api/bandit/arms?symbol=&regime=&side=` | `ADMIN` | Lista arms activos/candidatos con estadísticas. |
+| GET | `/api/bandit/pulls?symbol=&regime=&side=&limit=` | `ADMIN` | Últimos pulls con reward/contexto. |
+| GET | `/api/bandit/overview?symbol=` | `ADMIN` | Share canary y algoritmo activo. |
+| POST | `/api/bandit/arms/{id}/block` | `ADMIN` | Bloquea un preset para exclusión inmediata. |
+| POST | `/api/bandit/arms/{id}/unblock` | `ADMIN` | Rehabilita un preset. |
+| POST | `/api/bandit/reset?symbol=&regime=&side=&confirm=true` | `ADMIN` | Reinicia estadísticas decaídas del bandit. |
 
 ## Panel Web de Trading
 

@@ -30,3 +30,17 @@ throttle:
   queue:
     maxDepthPerSymbol: 100
     maxDepthGlobal: 2000
+bandit:
+  enabled: true
+  algorithm: THOMPSON
+  reward:
+    metric: pnl_r
+    cap_r: 3.0
+    slippage_penalty_bps: 0.30
+    fees_penalty_bps: 0.20
+  canary:
+    max_trades_per_day: 20
+    max_share_pct_per_day: 0.25
+  min_samples_to_compete: 30
+  decay:
+    half_life_days: 21
