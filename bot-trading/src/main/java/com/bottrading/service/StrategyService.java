@@ -10,6 +10,7 @@ import com.bottrading.strategy.StrategyFactory;
 import com.bottrading.strategy.StrategyDecision;
 import com.bottrading.research.regime.Regime;
 import com.bottrading.research.regime.RegimeEngine;
+import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.strategy.router.StrategyRouter;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -29,22 +30,32 @@ public class StrategyService {
   private final TradingProps tradingProps;
   private final RegimeEngine regimeEngine;
   private final StrategyRouter strategyRouter;
+  private final RiskGuard riskGuard;
 
   public StrategyService(
       BinanceClient binanceClient,
       StrategyFactory strategyFactory,
       TradingProps tradingProps,
       RegimeEngine regimeEngine,
-      StrategyRouter strategyRouter) {
+      StrategyRouter strategyRouter,
+      RiskGuard riskGuard) {
     this.binanceClient = binanceClient;
     this.strategyFactory = strategyFactory;
     this.tradingProps = tradingProps;
     this.regimeEngine = regimeEngine;
     this.strategyRouter = strategyRouter;
+    this.riskGuard = riskGuard;
   }
 
   public StrategyDecision decide(String symbol) {
     String effectiveSymbol = symbol != null ? symbol : tradingProps.getSymbol();
+    if (!riskGuard.canOpen(effectiveSymbol)) {
+      log.debug("Risk guard blocked strategy decision for {}", effectiveSymbol);
+      StrategyContext context =
+          StrategyContext.builder().symbol(effectiveSymbol).preset("default").build();
+      return new StrategyDecision(
+          SignalResult.flat("Risk guard pause in effect"), context, null, "default");
+    }
     String interval = tradingProps.getInterval();
     List<Kline> klines = binanceClient.getKlines(effectiveSymbol, interval, DEFAULT_KLINE_LIMIT);
     if (klines == null || klines.isEmpty()) {

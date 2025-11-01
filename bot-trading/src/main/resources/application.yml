@@ -12,3 +12,11 @@ presets:
   auto-promote: false
 leaderboard:
   enabled: true
+risk:
+  maxDailyLossPct: 3.0
+  maxDrawdownPct: 8.0
+  maxApiErrorPct: 5.0
+  maxWsReconnectsPerHour: 6
+  forceCloseOnPause: true
+  maxOpeningsPerDay: 10
+  maxTradeNotional: 0

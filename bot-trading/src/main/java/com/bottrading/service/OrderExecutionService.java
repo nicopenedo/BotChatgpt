@@ -15,6 +15,7 @@ import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.risk.RiskGuard;
+import com.bottrading.service.risk.TradeEvent;
 import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyDecision;
@@ -169,6 +170,15 @@ public class OrderExecutionService {
           request.getQuoteAmount(),
           response.status(),
           request.isDryRun());
+      if (!request.isDryRun()) {
+        BigDecimal notional =
+            request.getQuoteAmount() != null && request.getQuoteAmount().compareTo(BigDecimal.ZERO) > 0
+                ? request.getQuoteAmount()
+                : request.getQuantity() != null && lastPrice != null
+                    ? request.getQuantity().multiply(lastPrice)
+                    : null;
+        riskGuard.onTrade(new TradeEvent(symbol, true, BigDecimal.ZERO, null, notional));
+      }
       if (response.executedQty() != null && response.executedQty().compareTo(BigDecimal.ZERO) > 0) {
         tcaService.recordFill(response.clientOrderId(), response.price(), null, response.transactTime());
       }
