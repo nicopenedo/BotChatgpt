@@ -50,9 +50,13 @@ public class WalkForwardOptimizer {
               start,
               end,
               base.strategyConfig(),
+              base.genomesConfig(),
               base.slippageBps(),
               base.takerFeeBps(),
               base.makerFeeBps(),
+              base.useDynamicFees(),
+              base.seed(),
+              base.runId(),
               base.useCache()));
     }
     return segments;

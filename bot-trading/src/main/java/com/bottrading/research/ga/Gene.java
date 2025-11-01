@@ -17,4 +17,20 @@ class Gene {
     gene.params = new HashMap<>(this.params);
     return gene;
   }
+
+  boolean enabled() {
+    return enabled;
+  }
+
+  double weight() {
+    return weight;
+  }
+
+  double confidence() {
+    return confidence;
+  }
+
+  Map<String, Double> params() {
+    return params;
+  }
 }

@@ -10,7 +10,11 @@ public record BacktestRequest(
     Instant from,
     Instant to,
     Path strategyConfig,
+    Path genomesConfig,
     BigDecimal slippageBps,
     BigDecimal takerFeeBps,
     BigDecimal makerFeeBps,
+    boolean useDynamicFees,
+    Long seed,
+    String runId,
     boolean useCache) {}

@@ -1,5 +1,6 @@
 package com.bottrading.research.backtest;
 
+import com.bottrading.strategy.SignalSide;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -17,12 +18,18 @@ public class Portfolio {
   private BigDecimal basePosition = BigDecimal.ZERO;
   private Instant openTime;
   private BigDecimal entryPrice;
+  private TradeMetadata entryMetadata;
 
   public Portfolio(BigDecimal startingCapital) {
     this.quoteBalance = startingCapital;
   }
 
-  public void buy(Instant time, BigDecimal price, BigDecimal quantity, BigDecimal fee) {
+  public void buy(
+      Instant time,
+      BigDecimal price,
+      BigDecimal quantity,
+      BigDecimal fee,
+      TradeMetadata metadata) {
     if (basePosition.compareTo(BigDecimal.ZERO) > 0) {
       return;
     }
@@ -31,9 +38,15 @@ public class Portfolio {
     basePosition = quantity;
     entryPrice = price;
     openTime = time;
+    entryMetadata = metadata;
   }
 
-  public void sell(Instant time, BigDecimal price, BigDecimal quantity, BigDecimal fee) {
+  public void sell(
+      Instant time,
+      BigDecimal price,
+      BigDecimal quantity,
+      BigDecimal fee,
+      TradeMetadata metadata) {
     if (basePosition.compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
@@ -41,10 +54,27 @@ public class Portfolio {
     quoteBalance = quoteBalance.add(proceeds, mc);
     BigDecimal pnl =
         price.subtract(entryPrice, mc).multiply(quantity, mc).subtract(fee, mc);
-    trades.add(new TradeRecord(openTime, entryPrice, time, price, quantity, pnl, pnl.compareTo(BigDecimal.ZERO) > 0));
+    boolean win = pnl.compareTo(BigDecimal.ZERO) > 0;
+    TradeMetadata meta = entryMetadata != null ? entryMetadata : TradeMetadata.empty(SignalSide.BUY);
+    TradeMetadata exitMeta = metadata != null ? metadata : TradeMetadata.empty(SignalSide.SELL);
+    trades.add(
+        new TradeRecord(
+            openTime,
+            entryPrice,
+            time,
+            price,
+            quantity,
+            pnl,
+            win,
+            meta.side(),
+            meta.reason(),
+            exitMeta.reason(),
+            meta.signals(),
+            exitMeta.signals()));
     basePosition = BigDecimal.ZERO;
     entryPrice = null;
     openTime = null;
+    entryMetadata = null;
   }
 
   public void mark(Instant time, BigDecimal price) {
@@ -76,5 +106,15 @@ public class Portfolio {
 
   public List<EquityPoint> equityCurve() {
     return equityCurve;
+  }
+
+  public record TradeMetadata(SignalSide side, String reason, List<String> signals) {
+    public TradeMetadata {
+      signals = signals == null ? List.of() : List.copyOf(signals);
+    }
+
+    public static TradeMetadata empty(SignalSide side) {
+      return new TradeMetadata(side, "", List.of());
+    }
   }
 }

@@ -1,5 +1,6 @@
 package com.bottrading.research.ga;
 
+import com.bottrading.research.ga.io.GenomeSection;
 import com.bottrading.strategy.CompositeStrategy;
 import com.bottrading.strategy.Signal;
 import com.bottrading.strategy.signals.BollingerBandsSignal;
@@ -9,6 +10,8 @@ import com.bottrading.strategy.signals.RsiSignal;
 import com.bottrading.strategy.signals.SmaCrossoverSignal;
 import com.bottrading.strategy.signals.SupertrendSignal;
 import com.bottrading.research.backtest.MetricsSummary;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -60,6 +63,14 @@ public class Genome {
 
   public Map<String, Gene> genes() {
     return genes;
+  }
+
+  public GenomeSection toBuySection() {
+    return toSection(buyThreshold);
+  }
+
+  public GenomeSection toSellSection() {
+    return toSection(sellThreshold);
   }
 
   public double buyThreshold() {
@@ -119,6 +130,24 @@ public class Genome {
 
   private void tweakParameters(Gene gene, Random random) {
     gene.params.replaceAll((k, v) -> v + random.nextGaussian());
+  }
+
+  private GenomeSection toSection(double threshold) {
+    Map<String, Double> weights = new LinkedHashMap<>();
+    Map<String, Double> confidences = new LinkedHashMap<>();
+    Map<String, Map<String, Double>> params = new LinkedHashMap<>();
+    java.util.List<String> enabled = new ArrayList<>();
+    for (Map.Entry<String, Gene> entry : genes.entrySet()) {
+      String type = entry.getKey();
+      Gene gene = entry.getValue();
+      weights.put(type, gene.weight);
+      confidences.put(type, gene.confidence);
+      params.put(type, new LinkedHashMap<>(gene.params));
+      if (gene.enabled) {
+        enabled.add(type);
+      }
+    }
+    return new GenomeSection(threshold, enabled, weights, confidences, params);
   }
 
   private Signal createSignal(String type, Gene gene) {
