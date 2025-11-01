@@ -151,3 +151,48 @@ Chart base en `k8s/` con Deployment y Service listos para extender.
 
 ## Licencia
 MIT.
+
+## Stop Engine & OCO
+El `StopEngine` administra automáticamente `stop loss`, `take profit`, trailing y movimientos a breakeven para cada posición viva. Se puede operar en modo porcentaje o ATR y soporta emulación de OCO cuando Binance Spot no ofrece el endpoint. 
+
+- Configuración por símbolo vía `POST /api/stop/config` (requiere rol `ADMIN`).
+- Consulta de estado con `GET /api/stop/status?symbol=BTCUSDT`.
+- Persistencia en tablas `positions` y `managed_orders` incluyendo trailing/oco/breakeven.
+- Métricas: `stop.sl.hits`, `stop.tp.hits`, `stop.trailing.adjustments`, `stop.breakeven.moves`.
+
+Ejemplo de sizing percentil (BUY):
+```
+qty = (equity * (riskPct / 100)) / (entryPrice - stopLoss)
+```
+El motor mantiene las órdenes sincronizadas y cancela el extremo opuesto cuando una pata del OCO se ejecuta.
+
+## Sizing por riesgo
+`OrderSizingService` calcula el tamaño de posición dinámico en función del riesgo por trade configurado (`trading.risk-per-trade-pct`), la distancia al stop y las restricciones de `stepSize`/`minNotional`.
+
+- Modelos de slippage: `atr` o `fixedbps` (`sizing.slippage.model`).
+- Ajuste de `minNotional` con buffer (`sizing.min-notional-buffer-pct`).
+- Recomendación de tipo de orden (`MARKET`/`LIMIT`) y soporte opcional para iceberg.
+- Tests cubren BUY/SELL, diferentes distancias de stop y validaciones contra `stepSize`/`minNotional`.
+
+## Shadow Trading
+El `ShadowEngine` replica cada trade live en modo simulación usando las mismas reglas de stop y trailing, guardando resultados en `shadow_positions`.
+
+- Divergencias Live vs Shadow se consultan con `GET /api/shadow/status?symbol=BTCUSDT`.
+- Si la diferencia porcentual supera `shadow.divergence.pct-threshold` durante `shadow.divergence.min-trades` envía una alerta a Telegram.
+- Métricas: `shadow.divergence.alerts`, `shadow.pnl.live`, `shadow.pnl.shadow`.
+
+## Fee Optimizer
+`FeeService` cachea comisiones efectivas (maker/taker) 30 minutos y descuenta automáticamente al pagar con BNB. `BnbRebalancer` monitorea el buffer de BNB y ejecuta top-ups cuando la cobertura en días cae por debajo de `fees.bnb.min-days-buffer`.
+
+- Métricas: `fees.effective.maker`, `fees.effective.taker`, `fees.topups`.
+- Ajustar límites de reposición con `fees.bnb.min-topup-bnb` y `fees.bnb.max-topup-bnb`.
+
+## Alertas Telegram
+`TelegramNotifier` envía notificaciones Markdown a un chat configurado (`telegram.bot-token`, `telegram.chat-id`). Eventos cubiertos:
+
+- Fills/partial fills/cancelaciones.
+- Stops, take-profit, movimientos a breakeven y ajustes de trailing.
+- Kill-switch ON/OFF, reconexiones de WS, errores relevantes.
+- Divergencias Live vs Shadow y reposiciones de BNB.
+
+Para habilitar, establecer `TELEGRAM_ENABLED=true` en `.env` y proporcionar token + chat id.

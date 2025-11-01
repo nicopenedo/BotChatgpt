@@ -14,8 +14,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "positions")
-public class PositionEntity {
+@Table(name = "shadow_positions")
+public class ShadowPositionEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +29,8 @@ public class PositionEntity {
   @Column(name = "entry_price")
   private BigDecimal entryPrice;
 
-  private BigDecimal quantity;
+  @Column(name = "exit_price")
+  private BigDecimal exitPrice;
 
   @Column(name = "stop_loss")
   private BigDecimal stopLoss;
@@ -37,23 +38,10 @@ public class PositionEntity {
   @Column(name = "take_profit")
   private BigDecimal takeProfit;
 
-  @Column(name = "trailing_stop")
-  private BigDecimal trailingStop;
-
-  @Column(name = "trailing_offset")
-  private BigDecimal trailingOffset;
-
-  @Column(name = "breakeven_price")
-  private BigDecimal breakevenPrice;
-
-  @Column(name = "oco_group_id")
-  private String ocoGroupId;
-
-  @Column(name = "entry_atr")
-  private BigDecimal entryAtr;
-
   @Enumerated(EnumType.STRING)
   private PositionStatus status = PositionStatus.OPEN;
+
+  private BigDecimal quantity;
 
   @Column(name = "opened_at")
   private Instant openedAt;
@@ -61,8 +49,10 @@ public class PositionEntity {
   @Column(name = "closed_at")
   private Instant closedAt;
 
-  @Column(name = "last_adjustment_at")
-  private Instant lastAdjustmentAt;
+  @Column(name = "realized_pnl")
+  private BigDecimal realizedPnl;
+
+  private int trades;
 
   public Long getId() {
     return id;
@@ -96,12 +86,12 @@ public class PositionEntity {
     this.entryPrice = entryPrice;
   }
 
-  public BigDecimal getQuantity() {
-    return quantity;
+  public BigDecimal getExitPrice() {
+    return exitPrice;
   }
 
-  public void setQuantity(BigDecimal quantity) {
-    this.quantity = quantity;
+  public void setExitPrice(BigDecimal exitPrice) {
+    this.exitPrice = exitPrice;
   }
 
   public BigDecimal getStopLoss() {
@@ -120,52 +110,20 @@ public class PositionEntity {
     this.takeProfit = takeProfit;
   }
 
-  public BigDecimal getTrailingStop() {
-    return trailingStop;
-  }
-
-  public void setTrailingStop(BigDecimal trailingStop) {
-    this.trailingStop = trailingStop;
-  }
-
-  public BigDecimal getTrailingOffset() {
-    return trailingOffset;
-  }
-
-  public void setTrailingOffset(BigDecimal trailingOffset) {
-    this.trailingOffset = trailingOffset;
-  }
-
-  public BigDecimal getBreakevenPrice() {
-    return breakevenPrice;
-  }
-
-  public void setBreakevenPrice(BigDecimal breakevenPrice) {
-    this.breakevenPrice = breakevenPrice;
-  }
-
-  public String getOcoGroupId() {
-    return ocoGroupId;
-  }
-
-  public void setOcoGroupId(String ocoGroupId) {
-    this.ocoGroupId = ocoGroupId;
-  }
-
-  public BigDecimal getEntryAtr() {
-    return entryAtr;
-  }
-
-  public void setEntryAtr(BigDecimal entryAtr) {
-    this.entryAtr = entryAtr;
-  }
-
   public PositionStatus getStatus() {
     return status;
   }
 
   public void setStatus(PositionStatus status) {
     this.status = status;
+  }
+
+  public BigDecimal getQuantity() {
+    return quantity;
+  }
+
+  public void setQuantity(BigDecimal quantity) {
+    this.quantity = quantity;
   }
 
   public Instant getOpenedAt() {
@@ -184,11 +142,19 @@ public class PositionEntity {
     this.closedAt = closedAt;
   }
 
-  public Instant getLastAdjustmentAt() {
-    return lastAdjustmentAt;
+  public BigDecimal getRealizedPnl() {
+    return realizedPnl;
   }
 
-  public void setLastAdjustmentAt(Instant lastAdjustmentAt) {
-    this.lastAdjustmentAt = lastAdjustmentAt;
+  public void setRealizedPnl(BigDecimal realizedPnl) {
+    this.realizedPnl = realizedPnl;
+  }
+
+  public int getTrades() {
+    return trades;
+  }
+
+  public void setTrades(int trades) {
+    this.trades = trades;
   }
 }
