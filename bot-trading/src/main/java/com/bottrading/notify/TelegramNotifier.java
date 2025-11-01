@@ -85,6 +85,10 @@ public class TelegramNotifier {
     send("Error: " + message);
   }
 
+  public void notifyResearch(String message) {
+    send("Research: " + message);
+  }
+
   private void send(String message) {
     if (!properties.isEnabled()) {
       log.debug("Telegram disabled: {}", message);
