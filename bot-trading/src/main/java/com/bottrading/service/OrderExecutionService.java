@@ -15,6 +15,7 @@ import com.bottrading.execution.ExecutionEngine.ExecutionResult;
 import com.bottrading.execution.ExecutionRequest;
 import com.bottrading.execution.ExecutionRequest.Urgency;
 import com.bottrading.execution.MarketSnapshot;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.risk.IntradayVarService;
 import com.bottrading.service.risk.IntradayVarService.VarAssessment;
@@ -55,6 +56,7 @@ public class OrderExecutionService {
   private final ShadowEngine shadowEngine;
   private final ExecutionEngine executionEngine;
   private final IntradayVarService intradayVarService;
+  private final AnomalyDetector anomalyDetector;
 
   public OrderExecutionService(
       TradingProps tradingProps,
@@ -67,7 +69,8 @@ public class OrderExecutionService {
       PositionManager positionManager,
       ShadowEngine shadowEngine,
       ExecutionEngine executionEngine,
-      IntradayVarService intradayVarService) {
+      IntradayVarService intradayVarService,
+      AnomalyDetector anomalyDetector) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
     this.orderService = orderService;
@@ -79,6 +82,7 @@ public class OrderExecutionService {
     this.shadowEngine = shadowEngine;
     this.executionEngine = executionEngine;
     this.intradayVarService = intradayVarService;
+    this.anomalyDetector = anomalyDetector;
   }
 
   public Optional<ExecutionResult> execute(
@@ -242,9 +246,17 @@ public class OrderExecutionService {
             decision.preset(),
             decision.banditSelection() != null ? decision.banditSelection().presetId() : null);
       }
+      if (request.quantity().compareTo(BigDecimal.ZERO) > 0) {
+        double fillRate =
+            result.executedQty()
+                .divide(request.quantity(), 6, RoundingMode.HALF_UP)
+                .doubleValue();
+        anomalyDetector.recordFillRate(symbol, fillRate);
+      }
       return Optional.of(result);
     } catch (Exception ex) {
       log.error("Failed to execute order for {}: {}", decisionKey, ex.getMessage(), ex);
+      anomalyDetector.recordFillRate(symbol, 0.0);
       return Optional.empty();
     }
   }

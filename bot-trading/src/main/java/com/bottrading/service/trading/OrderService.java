@@ -7,12 +7,14 @@ import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.entity.OrderEntity;
 import com.bottrading.repository.OrderRepository;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradingState;
 import com.bottrading.util.IdGenerator;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +35,7 @@ public class OrderService {
   private final OrderRepository orderRepository;
   private final Counter ordersSent;
   private final Counter ordersFilled;
+  private final AnomalyDetector anomalyDetector;
 
   public OrderService(
       BinanceClient binanceClient,
@@ -40,7 +43,8 @@ public class OrderService {
       TradingState tradingState,
       RiskGuard riskGuard,
       OrderRepository orderRepository,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      AnomalyDetector anomalyDetector) {
     this.binanceClient = binanceClient;
     this.tradingProperties = tradingProperties;
     this.tradingState = tradingState;
@@ -48,6 +52,7 @@ public class OrderService {
     this.orderRepository = orderRepository;
     this.ordersSent = meterRegistry.counter("orders.sent");
     this.ordersFilled = meterRegistry.counter("orders.filled");
+    this.anomalyDetector = anomalyDetector;
   }
 
   @Transactional
@@ -67,8 +72,11 @@ public class OrderService {
       return simulateOrder(request);
     }
 
+    Instant started = Instant.now();
     try {
       OrderResponse response = binanceClient.placeOrder(request);
+      long latency = Duration.between(started, Instant.now()).toMillis();
+      anomalyDetector.recordApiCall(symbol, latency, true);
       riskGuard.onApiSuccess();
       persistOrder(response, request);
       ordersSent.increment();
@@ -77,6 +85,8 @@ public class OrderService {
       }
       return response;
     } catch (RuntimeException ex) {
+      long latency = Duration.between(started, Instant.now()).toMillis();
+      anomalyDetector.recordApiCall(symbol, latency, false);
       riskGuard.onApiError();
       throw ex;
     }

@@ -56,6 +56,8 @@ public class RiskGuard {
   private final AtomicInteger marketDataGauge = new AtomicInteger();
 
   private final EnumSet<RiskFlag> flags = EnumSet.noneOf(RiskFlag.class);
+  private final java.util.Map<RiskFlag, Instant> temporaryFlags = new java.util.EnumMap<>(RiskFlag.class);
+  private final java.util.Map<RiskFlag, String> temporaryDetails = new java.util.EnumMap<>(RiskFlag.class);
 
   private LocalDate currentDay = LocalDate.now(ZoneOffset.UTC);
   private Instant lastReset = Instant.now();
@@ -110,6 +112,7 @@ public class RiskGuard {
 
   public synchronized boolean canOpen(String symbol) {
     resetIfNeeded();
+    pruneTemporaryFlags();
     if (tradingState.isKillSwitchActive() || tradingState.isCoolingDown()) {
       return false;
     }
@@ -224,6 +227,7 @@ public class RiskGuard {
   }
 
   public synchronized RiskState getState() {
+    pruneTemporaryFlags();
     IntradayVarService.ExposureSnapshot exposure =
         intradayVarService != null
                 && intradayVarService.isEnabled()
@@ -242,11 +246,25 @@ public class RiskGuard {
         openingsToday.get(),
         currentEquity.get(),
         flags,
+        java.util.Map.copyOf(temporaryFlags),
         lastReset,
         exposure.exposure(),
         exposure.limit(),
         exposure.ratio(),
         marketDataStale.get());
+  }
+
+  public synchronized void applyTemporaryFlag(RiskFlag flag, Duration duration, String detail) {
+    if (flag == null || duration == null) {
+      return;
+    }
+    pruneTemporaryFlags();
+    Instant expiry = Instant.now().plus(duration);
+    temporaryFlags.put(flag, expiry);
+    if (detail != null) {
+      temporaryDetails.put(flag, detail);
+    }
+    tradingState.setCooldownUntil(expiry);
   }
 
   private void evaluateLosses() {
@@ -321,6 +339,8 @@ public class RiskGuard {
       apiErrorRate.set(0.0);
       wsReconnects.clear();
       wsReconnectGauge.set(0);
+      temporaryFlags.clear();
+      temporaryDetails.clear();
       dailyPnl.set(BigDecimal.ZERO);
       dailyLossPct.set(BigDecimal.ZERO);
       currentDrawdownPct.set(BigDecimal.ZERO);
@@ -343,5 +363,20 @@ public class RiskGuard {
 
   private void updateModeGauge() {
     modeGauge.set(RiskMode.fromTradingState(tradingState.getMode()).ordinal());
+  }
+
+  private void pruneTemporaryFlags() {
+    if (temporaryFlags.isEmpty()) {
+      return;
+    }
+    Instant now = Instant.now();
+    java.util.Iterator<java.util.Map.Entry<RiskFlag, Instant>> it = temporaryFlags.entrySet().iterator();
+    while (it.hasNext()) {
+      java.util.Map.Entry<RiskFlag, Instant> entry = it.next();
+      if (entry.getValue().isBefore(now)) {
+        temporaryDetails.remove(entry.getKey());
+        it.remove();
+      }
+    }
   }
 }

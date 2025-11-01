@@ -18,6 +18,7 @@ public final class RiskState {
   private final int openingsToday;
   private final BigDecimal currentEquity;
   private final Set<RiskFlag> flags;
+  private final java.util.Map<RiskFlag, Instant> temporaryFlags;
   private final Instant lastReset;
   private final BigDecimal varExposure;
   private final BigDecimal varLimit;
@@ -35,6 +36,7 @@ public final class RiskState {
       int openingsToday,
       BigDecimal currentEquity,
       Set<RiskFlag> flags,
+      java.util.Map<RiskFlag, Instant> temporaryFlags,
       Instant lastReset,
       BigDecimal varExposure,
       BigDecimal varLimit,
@@ -52,6 +54,10 @@ public final class RiskState {
     this.flags =
         Collections.unmodifiableSet(
             flags.isEmpty() ? EnumSet.noneOf(RiskFlag.class) : EnumSet.copyOf(flags));
+    this.temporaryFlags =
+        temporaryFlags == null
+            ? java.util.Map.of()
+            : java.util.Map.copyOf(temporaryFlags);
     this.lastReset = lastReset;
     this.varExposure = varExposure;
     this.varLimit = varLimit;
@@ -97,6 +103,10 @@ public final class RiskState {
 
   public Set<RiskFlag> flags() {
     return flags;
+  }
+
+  public java.util.Map<RiskFlag, Instant> temporaryFlags() {
+    return temporaryFlags;
   }
 
   public Instant lastReset() {

@@ -130,6 +130,19 @@
               </div>
             </div>
           </div>
+          <div id="anomalyBanner" class="alert anomaly-banner d-none mt-3" role="alert">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <span id="anomalySeverity" class="badge anomaly-badge">--</span>
+                <strong id="anomalyTitle" class="ms-2">Anomalía operativa</strong>
+                <div id="anomalyCause" class="text-muted small mt-1"></div>
+                <div id="anomalyExpires" class="text-muted small"></div>
+              </div>
+              <div class="sparkline-wrapper">
+                <canvas id="anomalySparkline" height="60"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

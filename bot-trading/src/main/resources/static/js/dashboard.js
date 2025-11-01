@@ -34,6 +34,14 @@
     heatmap: document.getElementById('heatmap'),
     regimeRibbon: document.getElementById('regimeRibbon'),
     regimeLegend: document.getElementById('regimeLegend'),
+    anomaly: {
+      banner: document.getElementById('anomalyBanner'),
+      severity: document.getElementById('anomalySeverity'),
+      title: document.getElementById('anomalyTitle'),
+      cause: document.getElementById('anomalyCause'),
+      expires: document.getElementById('anomalyExpires'),
+      sparkline: document.getElementById('anomalySparkline')
+    },
     status: {
       allocatorBadge: document.getElementById('allocatorBadge'),
       allocatorNote: document.getElementById('allocatorNote'),
@@ -167,6 +175,7 @@
   let equityChart;
   let drawdownChart;
   let heatmapInstance;
+  let anomalyChart;
 
   const crosshairPlugin = {
     id: 'crosshair-sync',
@@ -748,10 +757,91 @@
     }
   }
 
+  function renderAnomalyBanner(anomaly) {
+    const widgets = elements.anomaly || {};
+    if (!widgets.banner) return;
+    if (!anomaly || anomaly.active === false) {
+      widgets.banner.classList.add('d-none');
+      if (widgets.cause) widgets.cause.textContent = '';
+      if (widgets.expires) widgets.expires.textContent = '';
+      if (anomalyChart) {
+        anomalyChart.destroy();
+        anomalyChart = null;
+      }
+      return;
+    }
+    widgets.banner.classList.remove('d-none');
+    const severityLabel = (anomaly.severity || 'WARN').toString();
+    const severityClass = severityLabel.toLowerCase();
+    if (widgets.severity) {
+      widgets.severity.textContent = severityLabel;
+      widgets.severity.className = `badge anomaly-badge ${severityClass}`;
+    }
+    if (widgets.title) {
+      const metric = anomaly.metric ? anomaly.metric.toString().toUpperCase() : 'ANOMALÍA';
+      const action = anomaly.action ? anomaly.action.toString().replace(/_/g, ' ') : '';
+      widgets.title.textContent = action ? `${metric} → ${action}` : metric;
+    }
+    if (widgets.cause) {
+      widgets.cause.textContent = anomaly.cause || '';
+    }
+    if (widgets.expires) {
+      if (anomaly.expiresAt) {
+        const dt = DateTime.fromISO(anomaly.expiresAt, { zone: 'utc' });
+        widgets.expires.textContent = dt.isValid
+          ? `Cooldown hasta ${dt.toFormat('HH:mm:ss')} UTC`
+          : '';
+      } else {
+        widgets.expires.textContent = '';
+      }
+    }
+    const sparklineData = Array.isArray(anomaly.sparkline)
+      ? anomaly.sparkline.map(Number).filter((value) => Number.isFinite(value))
+      : [];
+    if (widgets.sparkline) {
+      if (!anomalyChart) {
+        anomalyChart = new Chart(widgets.sparkline.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: sparklineData.map((_, idx) => idx),
+            datasets: [
+              {
+                data: sparklineData,
+                borderColor: '#f97316',
+                backgroundColor: 'rgba(249, 115, 22, 0.25)',
+                pointRadius: 0,
+                fill: true,
+                tension: 0.3,
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: false }
+            },
+            scales: {
+              x: { display: false },
+              y: { display: false }
+            }
+          }
+        });
+      } else {
+        anomalyChart.data.labels = sparklineData.map((_, idx) => idx);
+        anomalyChart.data.datasets[0].data = sparklineData;
+        anomalyChart.update();
+      }
+    }
+  }
+
   function renderStatusCards(overview) {
     const status = elements.status;
     if (!status) return;
     if (!overview) {
+      renderAnomalyBanner(null);
       Object.values(status).forEach((el) => {
         if (el) {
           el.classList && el.classList.remove('ok', 'warn', 'error');
@@ -760,6 +850,8 @@
       });
       return;
     }
+
+    renderAnomalyBanner(overview.anomaly);
 
     const allocator = overview.allocator;
     if (allocator) {

@@ -1,6 +1,7 @@
 package com.bottrading.web;
 
 import com.bottrading.config.TradingProps;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.health.HealthService;
 import com.bottrading.service.health.HealthService.HealthStatus;
 import com.bottrading.service.risk.IntradayVarService;
@@ -30,6 +31,7 @@ public class StatusController {
   private final DriftWatchdog driftWatchdog;
   private final HealthService healthService;
   private final IntradayVarService intradayVarService;
+  private final AnomalyDetector anomalyDetector;
 
   public StatusController(
       TradingProps tradingProps,
@@ -37,13 +39,15 @@ public class StatusController {
       AllocatorService allocatorService,
       DriftWatchdog driftWatchdog,
       HealthService healthService,
-      IntradayVarService intradayVarService) {
+      IntradayVarService intradayVarService,
+      AnomalyDetector anomalyDetector) {
     this.tradingProps = tradingProps;
     this.riskGuard = riskGuard;
     this.allocatorService = allocatorService;
     this.driftWatchdog = driftWatchdog;
     this.healthService = healthService;
     this.intradayVarService = intradayVarService;
+    this.anomalyDetector = anomalyDetector;
   }
 
   @GetMapping("/overview")
@@ -62,6 +66,8 @@ public class StatusController {
     trading.put("riskFlags", riskState.flags());
     trading.put("marketDataStale", riskState.marketDataStale());
     VarStatus varStatus = intradayVarService.status(effective);
+    Map<String, Object> anomaly =
+        anomalyDetector.snapshot(effective).map(AnomalyDetector.AnomalySnapshot::asMap).orElse(Map.of("active", false));
     Map<String, Object> var = new HashMap<>();
     var.put("cvar", varStatus.cvar());
     var.put("var", varStatus.var());
@@ -77,7 +83,8 @@ public class StatusController {
             "drift", driftStatus,
             "health", healthStatus,
             "trading", trading,
-            "var", var));
+            "var", var,
+            "anomaly", anomaly));
   }
 }
 

@@ -1,6 +1,7 @@
 package com.bottrading.service.health;
 
 import com.bottrading.config.TradingProps;
+import com.bottrading.service.anomaly.AnomalyDetector;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -23,12 +24,15 @@ public class HealthService {
   private final AtomicBoolean healthy = new AtomicBoolean(true);
   private final AtomicReference<Double> errorRate = new AtomicReference<>(0.0);
   private final Counter pauses;
+  private final AnomalyDetector anomalyDetector;
 
-  public HealthService(TradingProps tradingProps, MeterRegistry meterRegistry) {
+  public HealthService(
+      TradingProps tradingProps, MeterRegistry meterRegistry, AnomalyDetector anomalyDetector) {
     this.tradingProps = tradingProps;
     this.pauses = meterRegistry.counter("health.pauses");
     meterRegistry.gauge("health.api.error.rate", errorRate, AtomicReference::get);
     meterRegistry.gauge("health.status", Tags.empty(), healthy, flag -> flag.get() ? 1.0 : 0.0);
+    this.anomalyDetector = anomalyDetector;
   }
 
   public void onWebsocketReconnect() {
@@ -43,6 +47,7 @@ public class HealthService {
         markUnhealthy();
       }
     }
+    tradingProps.getSymbols().forEach(symbol -> anomalyDetector.recordWsReconnects(symbol, wsReconnects.size()));
   }
 
   public void onApiCall(long latencyMs, boolean success) {
@@ -55,6 +60,7 @@ public class HealthService {
       pruneSamples(now);
       evaluateSamples();
     }
+    tradingProps.getSymbols().forEach(symbol -> anomalyDetector.recordApiCall(symbol, latencyMs, success));
   }
 
   public boolean isHealthy() {
