@@ -1,6 +1,7 @@
 package com.bottrading.service.binance;
 
 import com.binance.connector.client.impl.SpotClientImpl;
+import com.bottrading.chaos.ChaosSuite;
 import com.bottrading.config.BinanceProperties;
 import com.bottrading.config.CacheConfig;
 import com.bottrading.model.dto.AccountBalancesResponse;
@@ -44,15 +45,18 @@ public class BinanceClientImpl implements BinanceClient {
   private final CacheManager cacheManager;
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final Throttle throttle;
+  private final ChaosSuite chaosSuite;
 
   public BinanceClientImpl(
       BinanceProperties properties,
       CacheManager cacheManager,
-      Throttle throttle) {
+      Throttle throttle,
+      ChaosSuite chaosSuite) {
     this.spotClient =
         new SpotClientImpl(properties.apiKey(), properties.apiSecret(), properties.baseUrl());
     this.cacheManager = cacheManager;
     this.throttle = throttle;
+    this.chaosSuite = chaosSuite;
   }
 
   @Override
@@ -286,8 +290,9 @@ public class BinanceClientImpl implements BinanceClient {
   }
 
   private <T> T execute(Endpoint endpoint, String symbol, Supplier<T> supplier) {
+    Supplier<T> decorated = chaosSuite.decorateApiCall(supplier);
     try {
-      return throttle.submit(endpoint, symbol, supplier).toCompletableFuture().join();
+      return throttle.submit(endpoint, symbol, decorated).toCompletableFuture().join();
     } catch (CompletionException | CancellationException ex) {
       throw propagate(ex);
     }

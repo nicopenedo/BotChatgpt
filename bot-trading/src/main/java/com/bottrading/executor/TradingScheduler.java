@@ -2,6 +2,7 @@ package com.bottrading.executor;
 
 import com.bottrading.config.TradingProps;
 import com.bottrading.config.TradingProps.Mode;
+import com.bottrading.chaos.ChaosSuite;
 import com.bottrading.model.dto.Kline;
 import com.bottrading.repository.DecisionRepository;
 import com.bottrading.service.OrderExecutionService;
@@ -11,6 +12,7 @@ import com.bottrading.service.health.HealthService;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradingState;
 import com.bottrading.service.risk.drift.DriftWatchdog;
+import com.bottrading.service.market.CandleSanitizer;
 import com.bottrading.service.trading.AllocatorService;
 import com.bottrading.service.trading.AllocatorService.AllocationDecision;
 import com.bottrading.strategy.SignalResult;
@@ -69,6 +71,8 @@ public class TradingScheduler {
   private final Clock clock;
   private final Timer decisionTimer;
   private final Throttle throttle;
+  private final ChaosSuite chaosSuite;
+  private final CandleSanitizer candleSanitizer;
 
   private final Lock executionLock = new ReentrantLock();
   private final AtomicBoolean enabled = new AtomicBoolean(true);
@@ -90,7 +94,9 @@ public class TradingScheduler {
       DriftWatchdog driftWatchdog,
       HealthService healthService,
       ObjectProvider<Clock> clockProvider,
-      Throttle throttle) {
+      Throttle throttle,
+      ChaosSuite chaosSuite,
+      CandleSanitizer candleSanitizer) {
     this.tradingProps = tradingProps;
     this.strategyService = strategyService;
     this.tradingState = tradingState;
@@ -105,6 +111,8 @@ public class TradingScheduler {
     this.healthService = healthService;
     this.clock = Objects.requireNonNullElse(clockProvider.getIfAvailable(), Clock.systemUTC());
     this.throttle = Objects.requireNonNull(throttle, "throttle");
+    this.chaosSuite = Objects.requireNonNull(chaosSuite, "chaosSuite");
+    this.candleSanitizer = Objects.requireNonNull(candleSanitizer, "candleSanitizer");
     this.decisionTimer =
         Timer.builder("scheduler.candle.duration.ms")
             .publishPercentileHistogram()
@@ -155,7 +163,12 @@ public class TradingScheduler {
   }
 
   public void onCandleClosed(String symbol, String interval, long closeTime) {
-    processCandle(symbol, interval, closeTime, "websocket");
+    List<Long> sanitized = candleSanitizer.sanitize(symbol, interval, closeTime);
+    for (int i = 0; i < sanitized.size(); i++) {
+      long ts = sanitized.get(i);
+      String source = i == sanitized.size() - 1 ? "websocket" : "websocket-gap";
+      processCandle(symbol, interval, ts, source);
+    }
   }
 
   @Scheduled(fixedDelayString = "${trading.poll-delay-ms:1500}")
@@ -169,6 +182,10 @@ public class TradingScheduler {
         continue;
       }
       try {
+        long baseDelayMs = Math.max(1000L, candleSanitizer.intervalMillis(tradingProps.getInterval()) / 4);
+        if (!chaosSuite.allowRestPoll(symbol, baseDelayMs, Instant.now(clock))) {
+          continue;
+        }
         if (!throttle.canSchedule(Endpoint.KLINES, symbol)) {
           continue;
         }
@@ -185,7 +202,15 @@ public class TradingScheduler {
         if (closeTime <= lastClose.get()) {
           continue;
         }
-        processCandle(symbol, tradingProps.getInterval(), closeTime, "polling");
+        List<Long> sanitized = candleSanitizer.sanitize(symbol, tradingProps.getInterval(), closeTime);
+        for (int i = 0; i < sanitized.size(); i++) {
+          long ts = sanitized.get(i);
+          String source = i == sanitized.size() - 1 ? "polling" : "polling-gap";
+          processCandle(symbol, tradingProps.getInterval(), ts, source);
+        }
+        if (!sanitized.isEmpty()) {
+          chaosSuite.onWebsocketState(false);
+        }
       } catch (Exception ex) {
         log.warn("Polling klines failed for {}: {}", symbol, ex.getMessage());
       }
@@ -196,7 +221,7 @@ public class TradingScheduler {
     if (!enabled.get()) {
       return false;
     }
-    if (tradingProps.getMode() == Mode.POLLING) {
+    if (tradingProps.getMode() == Mode.POLLING || chaosSuite.forceRestFallback()) {
       return true;
     }
     if (symbol.equalsIgnoreCase(tradingProps.getSymbol())) {

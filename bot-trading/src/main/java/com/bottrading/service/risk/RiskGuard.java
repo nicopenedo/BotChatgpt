@@ -18,6 +18,7 @@ import java.util.Deque;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
@@ -51,6 +52,8 @@ public class RiskGuard {
   private final Deque<Instant> wsReconnects = new ArrayDeque<>();
   private final AtomicInteger wsReconnectGauge = new AtomicInteger();
   private final AtomicInteger modeGauge = new AtomicInteger();
+  private final AtomicBoolean marketDataStale = new AtomicBoolean();
+  private final AtomicInteger marketDataGauge = new AtomicInteger();
 
   private final EnumSet<RiskFlag> flags = EnumSet.noneOf(RiskFlag.class);
 
@@ -78,6 +81,7 @@ public class RiskGuard {
     meterRegistry.gauge("risk.api_error_rate", Tags.empty(), apiErrorRate, ref -> ref.get());
     meterRegistry.gauge("risk.ws_reconnects", Tags.empty(), wsReconnectGauge, AtomicInteger::get);
     meterRegistry.gauge("bot.mode", Tags.empty(), modeGauge, AtomicInteger::get);
+    meterRegistry.gauge("risk.market_data_stale", Tags.empty(), marketDataGauge, AtomicInteger::get);
     updateModeGauge();
   }
 
@@ -107,6 +111,9 @@ public class RiskGuard {
   public synchronized boolean canOpen(String symbol) {
     resetIfNeeded();
     if (tradingState.isKillSwitchActive() || tradingState.isCoolingDown()) {
+      return false;
+    }
+    if (marketDataStale.get()) {
       return false;
     }
     if (!flags.isEmpty() && tradingState.getMode() == TradingState.Mode.PAUSED) {
@@ -197,6 +204,15 @@ public class RiskGuard {
     flags.clear();
   }
 
+  public synchronized void setMarketDataStale(boolean stale) {
+    marketDataStale.set(stale);
+    marketDataGauge.set(stale ? 1 : 0);
+  }
+
+  public boolean isMarketDataStale() {
+    return marketDataStale.get();
+  }
+
   public synchronized void setMode(RiskMode mode) {
     tradingState.setMode(mode.toTradingMode());
     if (mode == RiskMode.PAUSED) {
@@ -229,7 +245,8 @@ public class RiskGuard {
         lastReset,
         exposure.exposure(),
         exposure.limit(),
-        exposure.ratio());
+        exposure.ratio(),
+        marketDataStale.get());
   }
 
   private void evaluateLosses() {

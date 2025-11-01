@@ -86,4 +86,13 @@ class RiskGuardTest {
     assertThat(riskGuard.getState().flags()).contains(RiskFlag.DAILY_LOSS);
     verify(positionManager).forceCloseAll();
   }
+
+  @Test
+  void shouldBlockWhenMarketDataIsStale() {
+    assertThat(riskGuard.canOpen("BTCUSDT")).isTrue();
+    riskGuard.setMarketDataStale(true);
+    assertThat(riskGuard.canOpen("BTCUSDT")).isFalse();
+    riskGuard.setMarketDataStale(false);
+    assertThat(riskGuard.canOpen("BTCUSDT")).isTrue();
+  }
 }

@@ -2,6 +2,7 @@ package com.bottrading.service.binance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bottrading.chaos.ChaosSuite;
 import com.bottrading.config.BinanceProperties;
 import com.bottrading.config.CacheConfig;
 import com.bottrading.model.dto.OrderRequest;
@@ -12,15 +13,16 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import io.github.resilience4j.ratelimiter.RateLimiterConfig;
-import io.github.resilience4j.retry.RetryConfig;
 import java.math.BigDecimal;
-import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
+
+import com.bottrading.throttle.Throttle;
 
 class BinanceClientIntegrationTest {
 
@@ -37,10 +39,17 @@ class BinanceClientIntegrationTest {
         new BinanceProperties("key", "secret", wireMockServer.baseUrl());
     CacheManager cacheManager = new CaffeineCacheManager(CacheConfig.EXCHANGE_INFO_CACHE, CacheConfig.COMMISSION_CACHE);
     ((CaffeineCacheManager) cacheManager).setCaffeine(Caffeine.newBuilder());
-    RetryConfig retryConfig = RetryConfig.custom().maxAttempts(1).waitDuration(Duration.ofMillis(10)).build();
-    RateLimiterConfig rateLimiterConfig =
-        RateLimiterConfig.custom().limitRefreshPeriod(Duration.ofSeconds(1)).limitForPeriod(10).timeoutDuration(Duration.ofSeconds(1)).build();
-    binanceClient = new BinanceClientImpl(properties, cacheManager, retryConfig, rateLimiterConfig);
+    Throttle throttle = Mockito.mock(Throttle.class);
+    Mockito
+        .when(throttle.submit(Mockito.any(), Mockito.any(), Mockito.any()))
+        .thenAnswer(invocation -> {
+          @SuppressWarnings("unchecked")
+          java.util.function.Supplier<Object> supplier = invocation.getArgument(2);
+          return CompletableFuture.completedFuture(supplier.get());
+        });
+    ChaosSuite chaosSuite = Mockito.mock(ChaosSuite.class);
+    Mockito.when(chaosSuite.decorateApiCall(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+    binanceClient = new BinanceClientImpl(properties, cacheManager, throttle, chaosSuite);
   }
 
   @AfterEach

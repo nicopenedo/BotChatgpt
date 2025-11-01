@@ -22,6 +22,7 @@ public final class RiskState {
   private final BigDecimal varExposure;
   private final BigDecimal varLimit;
   private final BigDecimal varRatio;
+  private final boolean marketDataStale;
 
   public RiskState(
       RiskMode mode,
@@ -37,7 +38,8 @@ public final class RiskState {
       Instant lastReset,
       BigDecimal varExposure,
       BigDecimal varLimit,
-      BigDecimal varRatio) {
+      BigDecimal varRatio,
+      boolean marketDataStale) {
     this.mode = mode;
     this.dailyPnl = dailyPnl;
     this.dailyLossPct = dailyLossPct;
@@ -54,6 +56,7 @@ public final class RiskState {
     this.varExposure = varExposure;
     this.varLimit = varLimit;
     this.varRatio = varRatio;
+    this.marketDataStale = marketDataStale;
   }
 
   public RiskMode mode() {
@@ -110,5 +113,9 @@ public final class RiskState {
 
   public BigDecimal varRatio() {
     return varRatio;
+  }
+
+  public boolean marketDataStale() {
+    return marketDataStale;
   }
 }
