@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+  <th:block th:fragment="pagination(page)">
+    <nav class="flex items-center justify-between" aria-label="Paginación">
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        Página <span th:text="${page.number + 1}">1</span> de <span th:text="${page.totalPages}">5</span>
+      </p>
+      <div class="flex items-center gap-2">
+        <a
+          th:href="${page.prevUrl}"
+          class="pagination-btn"
+          th:classappend="${!page.hasPrevious} ? ' disabled'"
+          aria-label="Anterior"
+        >
+          Anterior
+        </a>
+        <a
+          th:href="${page.nextUrl}"
+          class="pagination-btn"
+          th:classappend="${!page.hasNext} ? ' disabled'"
+          aria-label="Siguiente"
+        >
+          Siguiente
+        </a>
+      </div>
+    </nav>
+  </th:block>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <th:block th:replace="~{layout :: layout('Presets', 'presets', ~{::content})}">
+    <th:block th:fragment="content">
+      <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">Presets cuantitativos</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Compará performance por régimen y promové candidatos.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a class="btn-secondary" href="#">Importar JSON</a>
+          <a class="btn-primary" href="#">Crear preset</a>
+        </div>
+      </section>
+      <section class="grid gap-6 lg:grid-cols-3">
+        <article th:each="preset : ${regimeSummary}" class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title" th:text="${preset.name}">UP Regime</h3>
+              <p class="card-subtitle" th:text="${preset.caption}">Tendencia alcista</p>
+            </div>
+            <span class="tag-pill" th:classappend="' ' + ${preset.statusClass}" th:text="${preset.status}">Activo</span>
+          </div>
+          <dl class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-400">PF</dt>
+              <dd class="text-lg font-semibold" th:text="${preset.pf}">1.8</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-400">Sharpe</dt>
+              <dd class="text-lg font-semibold" th:text="${preset.sharpe}">1.2</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-400">Max DD</dt>
+              <dd class="text-lg font-semibold" th:text="${preset.maxDd}">-6.5%</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-slate-400">Trades</dt>
+              <dd class="text-lg font-semibold" th:text="${preset.trades}">210</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">Presets activos</h3>
+            <p class="card-subtitle">Filtrá por régimen</p>
+          </div>
+          <form class="flex flex-wrap items-center gap-2 text-sm" th:action="@{/tenant/presets}" method="get">
+            <label class="sr-only" for="regime">Régimen</label>
+            <select class="form-input" id="regime" name="regime">
+              <option value="">Todos</option>
+              <option th:each="reg : ${regimeFilter}" th:value="${reg.value}" th:text="${reg.label}" th:selected="${reg.selected}"></option>
+            </select>
+            <button class="btn-secondary" type="submit">Filtrar</button>
+          </form>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Régimen</th>
+                <th>Modo</th>
+                <th>PF</th>
+                <th>Sharpe</th>
+                <th>MaxDD</th>
+                <th>Trades</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="preset : ${presets}">
+                <td class="font-semibold" th:text="${preset.name}">Momentum Shadow</td>
+                <td>
+                  <span class="tag-pill regime" th:classappend="' ' + ${preset.regimeClass}" th:text="${preset.regime}">UP</span>
+                </td>
+                <td th:text="${preset.mode}">Activo</td>
+                <td th:text="${preset.pf}">1.8</td>
+                <td th:text="${preset.sharpe}">1.2</td>
+                <td th:text="${preset.maxDd}">-6.5%</td>
+                <td th:text="${preset.trades}">210</td>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <a class="btn-link" th:href="@{|/tenant/presets/${preset.id}|}">Detalle</a>
+                    <button class="btn-icon" type="button" x-on:click="showToast('Preset promovido', 'success')">
+                      <span class="sr-only">Promover preset</span>
+                      <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 3l7 7-1.4 1.4L10 5.8l-5.6 5.6L3 10z" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </th:block>
+  </th:block>
+</html>

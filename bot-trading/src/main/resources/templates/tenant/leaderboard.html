@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <th:block th:replace="~{layout :: layout('Leaderboard', 'leaderboard', ~{::content})}">
+    <th:block th:fragment="content">
+      <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">Leaderboard</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Ranking consolidado de bots, presets y símbolos.</p>
+        </div>
+        <form class="flex flex-wrap items-center gap-2" th:action="@{/tenant/leaderboard}" method="get">
+          <select class="form-input" name="entity">
+            <option th:each="option : ${entityOptions}" th:value="${option.value}" th:text="${option.label}" th:selected="${option.selected}"></option>
+          </select>
+          <select class="form-input" name="window">
+            <option th:each="window : ${windowOptions}" th:value="${window.value}" th:text="${window.label}" th:selected="${window.selected}"></option>
+          </select>
+          <button class="btn-secondary" type="submit">Actualizar</button>
+        </form>
+      </section>
+      <section class="card">
+        <div class="card-header">
+          <h3 class="card-title">Top performers</h3>
+          <p class="card-subtitle">Ordenado por Profit Factor</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>PF</th>
+                <th>PnL</th>
+                <th>WinRate</th>
+                <th>MaxDD</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="entry, iter : ${entries}">
+                <td th:text="${iter.index + 1}">1</td>
+                <td class="font-semibold" th:text="${entry.name}">BTC Momentum</td>
+                <td>
+                  <span class="tag-pill" th:classappend="' ' + ${entry.typeClass}" th:text="${entry.type}">Bot</span>
+                </td>
+                <td th:text="${entry.pf}">2.1</td>
+                <td th:text="${entry.pnl}">$4 500</td>
+                <td th:text="${entry.winRate}">62%</td>
+                <td th:text="${entry.maxDd}">-5.4%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </th:block>
+  </th:block>
+</html>

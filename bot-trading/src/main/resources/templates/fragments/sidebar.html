@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+  <th:block th:fragment="sidebar(activePage, tenantSwitcher)">
+    <div class="flex h-full flex-col gap-6 p-6">
+      <a class="flex items-center gap-3" th:href="@{/tenant/dashboard}">
+        <img class="h-9 w-9" th:src="@{/img/logo.svg}" alt="QuantBot" />
+        <div>
+          <p class="text-xs font-medium uppercase tracking-wide text-primary">QuantBot</p>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Multi-tenant trading</p>
+        </div>
+      </a>
+      <nav class="flex flex-1 flex-col gap-2" aria-label="Navegación principal">
+        <a
+          th:href="@{/tenant/dashboard}"
+          th:class="${activePage} == 'dashboard' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Dashboard</span>
+        </a>
+        <a th:href="@{/tenant/bots}" th:class="${activePage} == 'bots' ? 'sidebar-link active' : 'sidebar-link'">
+          <span>Bots</span>
+        </a>
+        <a
+          th:href="@{/tenant/presets}"
+          th:class="${activePage} == 'presets' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Presets</span>
+        </a>
+        <a
+          th:href="@{/tenant/leaderboard}"
+          th:class="${activePage} == 'leaderboard' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Leaderboard</span>
+        </a>
+        <a
+          th:href="@{/tenant/reports}"
+          th:class="${activePage} == 'reports' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Reportes</span>
+        </a>
+        <a
+          th:href="@{/tenant/billing}"
+          th:class="${activePage} == 'billing' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Billing</span>
+        </a>
+        <a
+          th:href="@{/tenant/settings}"
+          th:class="${activePage} == 'settings' ? 'sidebar-link active' : 'sidebar-link'"
+        >
+          <span>Settings</span>
+        </a>
+      </nav>
+      <div class="rounded-xl bg-slate-100 p-4 text-sm dark:bg-slate-800">
+        <p class="font-semibold text-slate-900 dark:text-slate-50">Soporte 24/7</p>
+        <p class="mt-1 text-slate-600 dark:text-slate-300">
+          ¿Dudas sobre tu tenant? Escribinos a
+          <a class="font-medium text-primary" href="mailto:soporte@quantbot.dev">soporte@quantbot.dev</a>.
+        </p>
+      </div>
+    </div>
+  </th:block>
+</html>

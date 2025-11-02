@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <th:block th:replace="~{layout :: layout('Reportes', 'reports', ~{::content})}">
+    <th:block th:fragment="content">
+      <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">Reportes mensuales</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">Descargá PDF consolidados para auditoría y compliance.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-secondary" type="button" x-on:click="showToast('Exportando CSV...', 'info')">Exportar CSV</button>
+          <button class="btn-primary" type="button" x-on:click="showToast('Agendado envío por email', 'success')">Enviar por email</button>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-header">
+          <h3 class="card-title">Historial</h3>
+          <p class="card-subtitle">Reportes disponibles para <span th:text="${tenantName}">DEMO</span></p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Equity promedio</th>
+                <th>PnL</th>
+                <th>Drawdown</th>
+                <th>Descargar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="report : ${reports}">
+                <td th:text="${report.month}">Marzo 2024</td>
+                <td th:text="${report.equity}">$120K</td>
+                <td th:text="${report.pnl}">$6.5K</td>
+                <td th:text="${report.maxDd}">-4.3%</td>
+                <td>
+                  <a class="btn-secondary" th:href="@{|/api/reports/monthly?tenantName=${report.downloadTenant}&month=${report.downloadMonth}|}" target="_blank" rel="noopener">
+                    PDF
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </th:block>
+  </th:block>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <th:block th:replace="~{layout :: layout('Billing', 'billing', ~{::content})}">
+    <th:block th:fragment="content">
+      <section class="grid gap-6 lg:grid-cols-3">
+        <article class="card lg:col-span-2">
+          <div class="card-header">
+            <h2 class="card-title">Plan actual</h2>
+            <p class="card-subtitle">Gestioná límites y upgrades</p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Plan</p>
+              <p class="mt-1 text-2xl font-semibold" th:text="${billing.plan}">Starter</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Estado</p>
+              <span class="tag-pill live" th:text="${billing.status}">Activo</span>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Bots LIVE</p>
+              <p class="mt-1 text-lg" th:text="${billing.liveUsage}">2 / 5</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Storage reportes</p>
+              <p class="mt-1 text-lg" th:text="${billing.storageUsage}">18 GB</p>
+            </div>
+          </div>
+          <div class="mt-6 flex flex-wrap gap-2">
+            <button class="btn-primary" type="button">Subir a PRO</button>
+            <button class="btn-secondary" type="button">Agregar método de pago</button>
+          </div>
+        </article>
+        <article class="card">
+          <div class="card-header">
+            <h2 class="card-title">Próximos pasos</h2>
+          </div>
+          <ul class="space-y-3 text-sm text-slate-500 dark:text-slate-300">
+            <li>Integración Stripe/Mercado Pago en progreso.</li>
+            <li>Soporte a facturación electrónica AR / MX.</li>
+            <li>Alertas automáticas de renovación.</li>
+          </ul>
+        </article>
+      </section>
+      <section class="card">
+        <div class="card-header">
+          <h3 class="card-title">Historial de facturación</h3>
+          <p class="card-subtitle">Movimientos últimos 12 meses</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Factura</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr th:each="invoice : ${billing.invoices}">
+                <td th:text="${invoice.date}">2024-02-01</td>
+                <td th:text="${invoice.description}">Plan Starter</td>
+                <td th:text="${invoice.amount}">$199</td>
+                <td>
+                  <span class="tag-pill" th:classappend="' ' + ${invoice.statusClass}" th:text="${invoice.status}">Pagado</span>
+                </td>
+                <td><a class="btn-link" href="#">Descargar</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </th:block>
+  </th:block>
+</html>

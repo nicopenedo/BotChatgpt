@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <th:block th:replace="~{layout :: layout(${bot.name}, 'bots', ~{::content})}">
+    <th:block th:fragment="content">
+      <section class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="tag-pill" th:classappend="' ' + ${bot.modeClass}" th:text="${bot.mode}">SHADOW</span>
+            <span class="tag-pill regime" th:classappend="' ' + ${bot.regimeClass}" th:text="${bot.regime}">UP</span>
+          </div>
+          <h2 class="mt-3 text-3xl font-semibold text-slate-900 dark:text-white" th:text="${bot.name}">BTC Swing</h2>
+          <p class="text-sm text-slate-500" th:text="${bot.symbol}">BTCUSDT · 1h</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-secondary" type="button" x-on:click="showToast('Preset recalculado', 'success')">Recalcular preset</button>
+          <button class="btn-secondary" type="button" x-on:click="showToast('Rebalance enviado', 'info')">Forzar rebalance</button>
+          <button class="btn-primary" type="button">Editar bot</button>
+        </div>
+      </section>
+      <section class="grid gap-6 lg:grid-cols-5">
+        <article class="card lg:col-span-3">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Equity bot</h3>
+              <p class="card-subtitle">Histórico últimos 90 días</p>
+            </div>
+          </div>
+          <canvas id="bot-equity-chart" class="chart" th:attr="data-chart=${equityChart}"></canvas>
+        </article>
+        <article class="card lg:col-span-2">
+          <div class="card-header">
+            <h3 class="card-title">PnL por símbolo</h3>
+          </div>
+          <canvas id="bot-symbol-chart" class="chart" th:attr="data-chart=${symbolChart}"></canvas>
+        </article>
+        <article class="card lg:col-span-2">
+          <div class="card-header">
+            <h3 class="card-title">Slippage &amp; Fees</h3>
+            <p class="card-subtitle">Promedio últimos 30 trades</p>
+          </div>
+          <canvas id="bot-slippage-chart" class="chart" th:attr="data-chart=${slippageChart}"></canvas>
+        </article>
+        <article class="card lg:col-span-3">
+          <div class="card-header">
+            <h3 class="card-title">Reglas y límites</h3>
+          </div>
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div th:each="rule : ${bot.rules}" class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <dt class="font-semibold text-slate-600 dark:text-slate-300" th:text="${rule.label}">Presets</dt>
+              <dd class="mt-1 text-slate-500 dark:text-slate-400" th:text="${rule.value}">Preset Momentum Shadow v2</dd>
+            </div>
+          </dl>
+        </article>
+        <article class="card lg:col-span-5">
+          <div class="card-header">
+            <h3 class="card-title">Logs recientes</h3>
+            <p class="card-subtitle">Eventos críticos y decisiones del bandit</p>
+          </div>
+          <div class="space-y-3">
+            <article th:each="log : ${bot.logs}" class="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <header class="flex items-center justify-between">
+                <p class="font-semibold" th:text="${log.title}">Bandit decision</p>
+                <span class="text-xs text-slate-400" th:text="${log.timestamp}">Hace 5m</span>
+              </header>
+              <p class="mt-2 text-slate-600 dark:text-slate-300" th:text="${log.message}">Se promovió preset Momentum Shadow v2.</p>
+            </article>
+          </div>
+        </article>
+      </section>
+    </th:block>
+  </th:block>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crear cuenta | QuantBot</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
+      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+  </head>
+  <body class="bg-slate-50">
+    <div class="mx-auto flex min-h-screen max-w-6xl flex-col justify-center gap-10 px-6 py-16 lg:flex-row lg:items-center">
+      <div class="lg:w-1/2">
+        <p class="text-sm font-semibold uppercase tracking-widest text-primary">QuantBot SaaS</p>
+        <h1 class="mt-4 text-4xl font-bold text-slate-900">
+          Potenciá tu mesa cuantitativa con bots multi-exchange listos para producir.
+        </h1>
+        <p class="mt-4 text-lg text-slate-600">
+          Crea tu tenant demo en minutos. Configurá bots en modo shadow, monitoreá P&L en tiempo real y desbloqueá reportes
+          listos para compliance.
+        </p>
+        <div class="mt-6 flex items-center gap-6 text-sm text-slate-500">
+          <div>
+            <p class="text-2xl font-semibold text-slate-900">+120</p>
+            <p>Integraciones listas</p>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold text-slate-900">99.95%</p>
+            <p>Uptime auditable</p>
+          </div>
+        </div>
+      </div>
+      <div class="lg:w-1/2">
+        <div class="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <form th:action="@{/signup}" th:object="${signupForm}" method="post" class="space-y-5">
+            <div>
+              <label class="form-label" for="tenantName">Nombre del tenant</label>
+              <input class="form-input" id="tenantName" th:field="*{tenantName}" type="text" required autofocus />
+              <p class="form-error" th:if="${#fields.hasErrors('tenantName')}" th:errors="*{tenantName}"></p>
+            </div>
+            <div>
+              <label class="form-label" for="email">Email corporativo</label>
+              <input class="form-input" id="email" th:field="*{email}" type="email" required autocomplete="email" />
+              <p class="form-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="form-label" for="firstName">Nombre</label>
+                <input class="form-input" id="firstName" th:field="*{firstName}" type="text" required />
+                <p class="form-error" th:if="${#fields.hasErrors('firstName')}" th:errors="*{firstName}"></p>
+              </div>
+              <div>
+                <label class="form-label" for="lastName">Apellido</label>
+                <input class="form-input" id="lastName" th:field="*{lastName}" type="text" required />
+                <p class="form-error" th:if="${#fields.hasErrors('lastName')}" th:errors="*{lastName}"></p>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" for="password">Contraseña</label>
+              <input class="form-input" id="password" th:field="*{password}" type="password" minlength="8" required />
+              <p class="form-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></p>
+            </div>
+            <div>
+              <label class="form-label">Plan</label>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label class="plan-option">
+                  <input class="sr-only" type="radio" th:field="*{plan}" value="STARTER" />
+                  <div class="plan-card" th:classappend="${signupForm.plan} == 'STARTER' ? ' active'">
+                    <p class="font-semibold">Starter</p>
+                    <p class="text-sm text-slate-500">Bots shadow ilimitados, hasta 2 en vivo.</p>
+                  </div>
+                </label>
+                <label class="plan-option">
+                  <input class="sr-only" type="radio" th:field="*{plan}" value="PRO" />
+                  <div class="plan-card" th:classappend="${signupForm.plan} == 'PRO' ? ' active'">
+                    <p class="font-semibold">Pro</p>
+                    <p class="text-sm text-slate-500">Backtesting avanzado y reportes auditables.</p>
+                  </div>
+                </label>
+              </div>
+              <p class="form-error" th:if="${#fields.hasErrors('plan')}" th:errors="*{plan}"></p>
+            </div>
+            <div class="flex items-start gap-3">
+              <input class="mt-1 h-4 w-4 rounded border-slate-300" id="terms" th:field="*{acceptedTerms}" type="checkbox" />
+              <label class="text-sm text-slate-600" for="terms">
+                Confirmo que acepto los
+                <a class="font-semibold text-primary" href="#">Términos del servicio</a> y las
+                <a class="font-semibold text-primary" href="#">Políticas de riesgos</a>.
+              </label>
+            </div>
+            <p class="form-error" th:if="${#fields.hasErrors('acceptedTerms')}" th:errors="*{acceptedTerms}"></p>
+            <button class="btn-primary w-full" type="submit">Crear tenant demo</button>
+          </form>
+          <p class="mt-4 text-center text-sm text-slate-500">
+            ¿Ya tenés cuenta?
+            <a class="font-medium text-primary hover:text-primary/80" th:href="@{/login}">Ingresá acá</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

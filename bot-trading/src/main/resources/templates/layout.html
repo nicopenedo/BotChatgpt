@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" x-data="appLayout()" x-bind:class="{ 'dark': darkMode }">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title th:text="${pageTitle} ?: 'QuantBot SaaS'">QuantBot SaaS</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/img/logo.svg}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
+      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css"
+      integrity="sha512-oIrM7AsQkpsVaDywuUcvGrHq12P9nhdybSj5dN4HLY9fgw5ZdxH51W8p7uJPbvvuhkEOvaowN9pE0yk6Lhv2mQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"
+      integrity="sha512-ZJ9U1IrJKinS8iGRTzT7PCaF4s9M1NS7RHzJd0/4rKQIGnBM6XmM/ZP63wYh6izLgjSRt0zd67UK+xfoWHK4lA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      integrity="sha384-7Y2A04iV/mnM8G8RATm5LOjgpaiAoYpAKhBpd8CUD0akMN7iEYB5tVWkqje3QM0l"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.10/htmx.min.js"
+      integrity="sha512-b1Qa1YhVFZu93OAYqGROzp4briJZ5hN2mN8B+yphcPw2Xv+0q7ez5L4amp1sJeRWddPjWBep1w7nJWy5uZO0EA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+    <th:block th:replace="${extraHead} ?: _" />
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-50">
+    <div class="flex min-h-screen">
+      <aside
+        class="hidden w-72 border-r border-slate-200 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 lg:block"
+        th:replace="~{fragments/sidebar :: sidebar(${activePage}, ${tenantSwitcher})}"
+      ></aside>
+      <div class="flex min-h-screen w-full flex-1 flex-col">
+        <header
+          class="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80"
+          th:replace="~{fragments/navbar :: navbar(${pageTitle}, ${tenantSwitcher}, ${notifications})}"
+        ></header>
+        <main class="flex-1 bg-slate-50/70 p-6 dark:bg-slate-950/60">
+          <div class="mx-auto flex max-w-7xl flex-col gap-6" th:replace="${content}"></div>
+        </main>
+      </div>
+    </div>
+    <div th:replace="~{fragments/toasts :: toastContainer}"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js" defer></script>
+    <script th:src="@{/js/app.js}" defer></script>
+  </body>
+</html>
