@@ -39,6 +39,9 @@ public class TenantSettingsEntity {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
+  @Column(name = "trading_paused", nullable = false)
+  private boolean tradingPaused = false;
+
   public UUID getTenantId() {
     return tenantId;
   }
@@ -109,5 +112,13 @@ public class TenantSettingsEntity {
 
   public void setUpdatedAt(Instant updatedAt) {
     this.updatedAt = updatedAt;
+  }
+
+  public boolean isTradingPaused() {
+    return tradingPaused;
+  }
+
+  public void setTradingPaused(boolean tradingPaused) {
+    this.tradingPaused = tradingPaused;
   }
 }

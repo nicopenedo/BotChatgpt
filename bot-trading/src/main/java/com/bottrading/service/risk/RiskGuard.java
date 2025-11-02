@@ -4,6 +4,8 @@ import com.bottrading.config.RiskProperties;
 import com.bottrading.config.TradingProps;
 import com.bottrading.model.entity.RiskEventEntity;
 import com.bottrading.repository.RiskEventRepository;
+import com.bottrading.saas.security.TenantContext;
+import com.bottrading.saas.service.TenantAccountService;
 import com.bottrading.saas.service.TenantMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -39,6 +41,7 @@ public class RiskGuard {
   private final Counter stopouts;
   private final IntradayVarService intradayVarService;
   private final TenantMetrics tenantMetrics;
+  private final TenantAccountService tenantAccountService;
 
   private final AtomicReference<BigDecimal> equityStart = new AtomicReference<>(BigDecimal.ZERO);
   private final AtomicReference<BigDecimal> equityPeak = new AtomicReference<>(BigDecimal.ZERO);
@@ -72,7 +75,8 @@ public class RiskGuard {
       RiskEventRepository riskEventRepository,
       MeterRegistry meterRegistry,
       IntradayVarService intradayVarService,
-      TenantMetrics tenantMetrics) {
+      TenantMetrics tenantMetrics,
+      TenantAccountService tenantAccountService) {
     this.tradingProperties = tradingProperties;
     this.riskProperties = riskProperties;
     this.tradingState = tradingState;
@@ -81,6 +85,7 @@ public class RiskGuard {
     this.stopouts = meterRegistry.counter("risk.stopouts", tenantMetrics.tags(tradingProperties.getSymbol()));
     this.intradayVarService = intradayVarService;
     this.tenantMetrics = tenantMetrics;
+    this.tenantAccountService = tenantAccountService;
     Tags tags = tenantMetrics.tags(tradingProperties.getSymbol());
     meterRegistry.gauge("risk.equity", tags, currentEquity, ref -> ref.get().doubleValue());
     meterRegistry.gauge("risk.daily_pnl", tags, dailyPnl, ref -> ref.get().doubleValue());
@@ -123,6 +128,10 @@ public class RiskGuard {
   public synchronized boolean canOpen(String symbol) {
     resetIfNeeded();
     pruneTemporaryFlags();
+    java.util.UUID tenantId = TenantContext.getTenantId();
+    if (tenantId != null && tenantAccountService != null && tenantAccountService.isTradingPaused(tenantId)) {
+      return false;
+    }
     if (tradingState.isKillSwitchActive() || tradingState.isCoolingDown()) {
       return false;
     }

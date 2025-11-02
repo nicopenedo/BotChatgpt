@@ -20,11 +20,14 @@ public class TermsAcceptanceEntity {
   @Column(name = "user_id", nullable = false)
   private UUID userId;
 
-  @Column(nullable = false)
-  private String version;
+  @Column(name = "terms_version_hash", nullable = false)
+  private String termsVersionHash;
 
-  @Column(name = "accepted_at", nullable = false)
-  private Instant acceptedAt;
+  @Column(name = "risk_version_hash", nullable = false)
+  private String riskVersionHash;
+
+  @Column(name = "consented_at", nullable = false)
+  private Instant consentedAt;
 
   private String ip;
 
@@ -54,20 +57,28 @@ public class TermsAcceptanceEntity {
     this.userId = userId;
   }
 
-  public String getVersion() {
-    return version;
+  public String getTermsVersionHash() {
+    return termsVersionHash;
   }
 
-  public void setVersion(String version) {
-    this.version = version;
+  public void setTermsVersionHash(String termsVersionHash) {
+    this.termsVersionHash = termsVersionHash;
   }
 
-  public Instant getAcceptedAt() {
-    return acceptedAt;
+  public String getRiskVersionHash() {
+    return riskVersionHash;
   }
 
-  public void setAcceptedAt(Instant acceptedAt) {
-    this.acceptedAt = acceptedAt;
+  public void setRiskVersionHash(String riskVersionHash) {
+    this.riskVersionHash = riskVersionHash;
+  }
+
+  public Instant getConsentedAt() {
+    return consentedAt;
+  }
+
+  public void setConsentedAt(Instant consentedAt) {
+    this.consentedAt = consentedAt;
   }
 
   public String getIp() {

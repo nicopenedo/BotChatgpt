@@ -4,6 +4,7 @@ import com.bottrading.saas.config.SaasProperties;
 import com.bottrading.saas.model.dto.ApiKeyRequest;
 import com.bottrading.saas.model.entity.TenantApiKeyEntity;
 import com.bottrading.saas.repository.TenantApiKeyRepository;
+import com.bottrading.saas.security.TenantUserDetails;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -19,16 +20,19 @@ public class TenantSecurityService {
   private final TenantApiKeyRepository apiKeyRepository;
   private final SecretEncryptionService encryptionService;
   private final AuditService auditService;
+  private final TotpService totpService;
 
   public TenantSecurityService(
       SaasProperties saasProperties,
       TenantApiKeyRepository apiKeyRepository,
       SecretEncryptionService encryptionService,
-      AuditService auditService) {
+      AuditService auditService,
+      TotpService totpService) {
     this.saasProperties = saasProperties;
     this.apiKeyRepository = apiKeyRepository;
     this.encryptionService = encryptionService;
     this.auditService = auditService;
+    this.totpService = totpService;
   }
 
   @Transactional
@@ -66,5 +70,12 @@ public class TenantSecurityService {
         "tenant.api-key.updated",
         java.util.Map.of("exchange", request.getExchange(), "label", request.getLabel()));
     return saved;
+  }
+
+  public boolean verifyTotp(TenantUserDetails user, String totp) {
+    if (user == null || !user.isMfaEnabled()) {
+      return true;
+    }
+    return totpService.verify(user.getMfaSecret(), totp);
   }
 }

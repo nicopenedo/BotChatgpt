@@ -28,6 +28,15 @@ public class TenantLimitsEntity {
   @Column(name = "max_trades_per_day", nullable = false)
   private int maxTradesPerDay;
 
+  @Column(name = "max_daily_drawdown_pct", nullable = false)
+  private BigDecimal maxDailyDrawdownPct;
+
+  @Column(name = "max_concurrent_positions", nullable = false)
+  private int maxConcurrentPositions;
+
+  @Column(name = "canary_pct", nullable = false)
+  private BigDecimal canaryPct;
+
   @Column(name = "data_retention_days", nullable = false)
   private int dataRetentionDays;
 
@@ -72,6 +81,30 @@ public class TenantLimitsEntity {
 
   public void setMaxTradesPerDay(int maxTradesPerDay) {
     this.maxTradesPerDay = maxTradesPerDay;
+  }
+
+  public BigDecimal getMaxDailyDrawdownPct() {
+    return maxDailyDrawdownPct;
+  }
+
+  public void setMaxDailyDrawdownPct(BigDecimal maxDailyDrawdownPct) {
+    this.maxDailyDrawdownPct = maxDailyDrawdownPct;
+  }
+
+  public int getMaxConcurrentPositions() {
+    return maxConcurrentPositions;
+  }
+
+  public void setMaxConcurrentPositions(int maxConcurrentPositions) {
+    this.maxConcurrentPositions = maxConcurrentPositions;
+  }
+
+  public BigDecimal getCanaryPct() {
+    return canaryPct;
+  }
+
+  public void setCanaryPct(BigDecimal canaryPct) {
+    this.canaryPct = canaryPct;
   }
 
   public int getDataRetentionDays() {

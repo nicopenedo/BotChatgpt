@@ -2,9 +2,14 @@ package com.bottrading.config;
 
 import com.bottrading.saas.security.MfaApiHeaderFilter;
 import com.bottrading.saas.security.MfaUiSessionFilter;
+import com.bottrading.saas.security.SanctionsFilter;
 import com.bottrading.saas.security.TenantContextFilter;
 import com.bottrading.saas.security.TenantUserDetails;
 import com.bottrading.saas.security.TenantUserDetailsService;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -17,8 +22,12 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -35,16 +44,34 @@ public class SecurityConfig {
   private final TenantContextFilter tenantContextFilter;
   private final MfaApiHeaderFilter mfaApiHeaderFilter;
   private final MfaUiSessionFilter mfaUiSessionFilter;
+  private final SanctionsFilter sanctionsFilter;
+  private final GrantedAuthoritiesMapper staffAuthoritiesMapper;
 
   public SecurityConfig(
       TenantUserDetailsService userDetailsService,
       TenantContextFilter tenantContextFilter,
       MfaApiHeaderFilter mfaApiHeaderFilter,
-      MfaUiSessionFilter mfaUiSessionFilter) {
+      MfaUiSessionFilter mfaUiSessionFilter,
+      SanctionsFilter sanctionsFilter,
+      GrantedAuthoritiesMapper staffAuthoritiesMapper) {
     this.userDetailsService = userDetailsService;
     this.tenantContextFilter = tenantContextFilter;
     this.mfaApiHeaderFilter = mfaApiHeaderFilter;
     this.mfaUiSessionFilter = mfaUiSessionFilter;
+    this.sanctionsFilter = sanctionsFilter;
+    this.staffAuthoritiesMapper = staffAuthoritiesMapper;
+  }
+
+  @Bean
+  @Order(0)
+  public SecurityFilterChain staffFilterChain(HttpSecurity http) throws Exception {
+    http.securityMatcher("/staff/**")
+        .authorizeHttpRequests(auth -> auth.anyRequest().hasAnyRole("SUPPORT_READ", "OPS_ACTIONS", "FINANCE"))
+        .oauth2Login(oauth -> oauth.userInfoEndpoint(info -> info.userAuthoritiesMapper(staffAuthoritiesMapper)))
+        .logout(logout -> logout.logoutUrl("/staff/logout").logoutSuccessUrl("/staff/login?logout"))
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS));
+    return http.build();
   }
 
   @Bean
@@ -68,6 +95,7 @@ public class SecurityConfig {
                     .authenticated())
         .httpBasic(Customizer.withDefaults());
     http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterAfter(sanctionsFilter, TenantContextFilter.class);
     http.addFilterAfter(mfaApiHeaderFilter, TenantContextFilter.class);
     return http.build();
   }
@@ -100,7 +128,8 @@ public class SecurityConfig {
                         "/img/**",
                         "/webhooks/**",
                         "/static/**",
-                        "/public/**")
+                        "/public/**",
+                        "/blocked")
                     .permitAll()
                     .requestMatchers("/tenant/**").hasAnyRole("OWNER", "ADMIN", "VIEWER")
                     .anyRequest()
@@ -136,6 +165,7 @@ public class SecurityConfig {
         .httpBasic(Customizer.withDefaults());
 
     http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterAfter(sanctionsFilter, TenantContextFilter.class);
     http.addFilterAfter(mfaUiSessionFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
@@ -159,5 +189,39 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+  @Bean
+  public GrantedAuthoritiesMapper staffAuthoritiesMapper() {
+    return authorities -> {
+      Set<GrantedAuthority> mapped = new HashSet<>();
+      for (GrantedAuthority authority : authorities) {
+        if (authority instanceof OAuth2UserAuthority oauth) {
+          Object roles = oauth.getAttributes().getOrDefault("staff_roles", oauth.getAttributes().get("roles"));
+          Collection<String> roleList =
+              roles instanceof Collection<?> collection
+                  ? collection.stream().map(Object::toString).toList()
+                  : roles instanceof String str
+                      ? List.of(str.split(","))
+                      : List.of();
+          Object mfa = oauth.getAttributes().get("mfa_verified");
+          if (mfa instanceof Boolean b && !b) {
+            throw new IllegalStateException("MFA requerido para personal");
+          }
+          if (roleList.isEmpty()) {
+            mapped.add(new SimpleGrantedAuthority("ROLE_SUPPORT_READ"));
+          } else {
+            roleList.stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(String::toUpperCase)
+                .forEach(role -> mapped.add(new SimpleGrantedAuthority("ROLE_" + role)));
+          }
+        } else {
+          mapped.add(authority);
+        }
+      }
+      return mapped;
+    };
   }
 }

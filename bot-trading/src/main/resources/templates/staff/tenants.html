@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tenants</title>
+  </head>
+  <body>
+    <h1>Tenants</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Plan</th>
+          <th>Status</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="tenant : ${tenants}">
+          <td th:text="${tenant.name}">Tenant</td>
+          <td th:text="${tenant.plan}">STARTER</td>
+          <td th:text="${tenant.status}">ACTIVE</td>
+          <td>
+            <form method="post" th:action="@{/staff/risk/pause-all}">
+              <input type="hidden" name="tenantId" th:value="${tenant.id}" />
+              <button type="submit" name="pause" value="true">Pausar</button>
+              <button type="submit" name="pause" value="false">Reanudar</button>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

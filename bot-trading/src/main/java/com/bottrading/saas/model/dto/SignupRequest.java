@@ -11,6 +11,7 @@ public class SignupRequest {
   @NotBlank private String password;
   @NotNull private TenantPlan plan;
   @NotBlank private String termsVersion;
+  @NotBlank private String riskVersion;
   @NotBlank private String ip;
   private String userAgent;
 
@@ -52,6 +53,14 @@ public class SignupRequest {
 
   public void setTermsVersion(String termsVersion) {
     this.termsVersion = termsVersion;
+  }
+
+  public String getRiskVersion() {
+    return riskVersion;
+  }
+
+  public void setRiskVersion(String riskVersion) {
+    this.riskVersion = riskVersion;
   }
 
   public String getIp() {

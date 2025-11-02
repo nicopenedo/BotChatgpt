@@ -19,6 +19,13 @@ public class TenantBillingEntity {
     MP
   }
 
+  public enum BillingState {
+    ACTIVE,
+    GRACE,
+    PAST_DUE,
+    DOWNGRADED
+  }
+
   @Id
   @Column(name = "tenant_id")
   private UUID tenantId;
@@ -36,8 +43,15 @@ public class TenantBillingEntity {
   @Column(nullable = false)
   private String plan;
 
-  @Column(nullable = false)
+  @Column(nullable = false, name = "provider_status")
   private String status;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "billing_state", nullable = false)
+  private BillingState billingState = BillingState.ACTIVE;
+
+  @Column(name = "grace_until")
+  private Instant graceUntil;
 
   @Column(name = "hwm_pnl_net", nullable = false)
   private BigDecimal hwmPnlNet;
@@ -91,6 +105,22 @@ public class TenantBillingEntity {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public BillingState getBillingState() {
+    return billingState;
+  }
+
+  public void setBillingState(BillingState billingState) {
+    this.billingState = billingState;
+  }
+
+  public Instant getGraceUntil() {
+    return graceUntil;
+  }
+
+  public void setGraceUntil(Instant graceUntil) {
+    this.graceUntil = graceUntil;
   }
 
   public BigDecimal getHwmPnlNet() {

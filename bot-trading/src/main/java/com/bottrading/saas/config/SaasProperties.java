@@ -66,6 +66,7 @@ public class SaasProperties {
 
   public static class Billing {
     private String provider = "stripe";
+    private int graceDays = 5;
 
     public String getProvider() {
       return provider;
@@ -73,6 +74,14 @@ public class SaasProperties {
 
     public void setProvider(String provider) {
       this.provider = provider;
+    }
+
+    public int getGraceDays() {
+      return graceDays;
+    }
+
+    public void setGraceDays(int graceDays) {
+      this.graceDays = graceDays;
     }
   }
 
@@ -103,6 +112,10 @@ public class SaasProperties {
     private BigDecimal canaryShareMax;
     private int dataRetentionDays;
     private Map<String, Boolean> featureFlags;
+    private BigDecimal maxDailyDrawdownPct = BigDecimal.ZERO;
+    private int maxConcurrentPositions = 0;
+    private int maxDailyTrades = 0;
+    private BigDecimal canaryPct = BigDecimal.ZERO;
 
     public int getMaxBots() {
       return maxBots;
@@ -142,6 +155,38 @@ public class SaasProperties {
 
     public void setFeatureFlags(Map<String, Boolean> featureFlags) {
       this.featureFlags = featureFlags;
+    }
+
+    public BigDecimal getMaxDailyDrawdownPct() {
+      return maxDailyDrawdownPct;
+    }
+
+    public void setMaxDailyDrawdownPct(BigDecimal maxDailyDrawdownPct) {
+      this.maxDailyDrawdownPct = maxDailyDrawdownPct;
+    }
+
+    public int getMaxConcurrentPositions() {
+      return maxConcurrentPositions;
+    }
+
+    public void setMaxConcurrentPositions(int maxConcurrentPositions) {
+      this.maxConcurrentPositions = maxConcurrentPositions;
+    }
+
+    public int getMaxDailyTrades() {
+      return maxDailyTrades;
+    }
+
+    public void setMaxDailyTrades(int maxDailyTrades) {
+      this.maxDailyTrades = maxDailyTrades;
+    }
+
+    public BigDecimal getCanaryPct() {
+      return canaryPct;
+    }
+
+    public void setCanaryPct(BigDecimal canaryPct) {
+      this.canaryPct = canaryPct;
     }
   }
 
@@ -189,6 +234,11 @@ public class SaasProperties {
 
   public static class Legal {
     private String termsVersion;
+    private String riskVersion;
+    private int exportTokenTtlMinutes = 15;
+    private int deletionMinHours = 24;
+    private int deletionMaxHours = 72;
+    private java.util.List<String> sanctionedCountries = java.util.List.of();
 
     public String getTermsVersion() {
       return termsVersion;
@@ -196,6 +246,46 @@ public class SaasProperties {
 
     public void setTermsVersion(String termsVersion) {
       this.termsVersion = termsVersion;
+    }
+
+    public String getRiskVersion() {
+      return riskVersion;
+    }
+
+    public void setRiskVersion(String riskVersion) {
+      this.riskVersion = riskVersion;
+    }
+
+    public int getExportTokenTtlMinutes() {
+      return exportTokenTtlMinutes;
+    }
+
+    public void setExportTokenTtlMinutes(int exportTokenTtlMinutes) {
+      this.exportTokenTtlMinutes = exportTokenTtlMinutes;
+    }
+
+    public int getDeletionMinHours() {
+      return deletionMinHours;
+    }
+
+    public void setDeletionMinHours(int deletionMinHours) {
+      this.deletionMinHours = deletionMinHours;
+    }
+
+    public int getDeletionMaxHours() {
+      return deletionMaxHours;
+    }
+
+    public void setDeletionMaxHours(int deletionMaxHours) {
+      this.deletionMaxHours = deletionMaxHours;
+    }
+
+    public java.util.List<String> getSanctionedCountries() {
+      return sanctionedCountries;
+    }
+
+    public void setSanctionedCountries(java.util.List<String> sanctionedCountries) {
+      this.sanctionedCountries = sanctionedCountries;
     }
   }
 

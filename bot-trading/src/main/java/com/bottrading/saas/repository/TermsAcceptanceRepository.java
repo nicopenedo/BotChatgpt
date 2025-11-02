@@ -6,5 +6,5 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TermsAcceptanceRepository extends JpaRepository<TermsAcceptanceEntity, UUID> {
-  List<TermsAcceptanceEntity> findByTenantIdOrderByAcceptedAtDesc(UUID tenantId);
+  List<TermsAcceptanceEntity> findByTenantIdOrderByConsentedAtDesc(UUID tenantId);
 }

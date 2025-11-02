@@ -1,5 +1,6 @@
 package com.bottrading.cli;
 
+import com.bottrading.cli.billing.BillingCliCommand;
 import com.bottrading.cli.preset.PresetsCommand;
 import com.bottrading.cli.preset.PresetsImportCommand;
 import com.bottrading.cli.preset.PresetsPromoteCommand;
@@ -13,7 +14,12 @@ import picocli.CommandLine;
 @Component
 @CommandLine.Command(
     name = "bot",
-    subcommands = {PresetsCommand.class, LeaderboardCliCommand.class, BacktestCliCommand.class},
+    subcommands = {
+      PresetsCommand.class,
+      LeaderboardCliCommand.class,
+      BacktestCliCommand.class,
+      BillingCliCommand.class
+    },
     mixinStandardHelpOptions = true,
     description = "Bot management CLI")
 public class BotRootCommand implements Runnable {
@@ -25,7 +31,7 @@ public class BotRootCommand implements Runnable {
 
   public boolean handles(String arg) {
     return switch (arg) {
-      case "presets", "leaderboard", "bt" -> true;
+      case "presets", "leaderboard", "bt", "billing" -> true;
       default -> false;
     };
   }
