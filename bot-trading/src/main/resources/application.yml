@@ -105,3 +105,27 @@ chaos:
   clock-drift-ms: 0
   safety:
     max-duration-sec: 600
+
+saas:
+  billing:
+    provider: stripe
+  plans:
+    starter:
+      max_bots: 1
+      max_symbols: 1
+      canary_share_max: 0.10
+      data_retention_days: 90
+    pro:
+      max_bots: 5
+      max_symbols: 3
+      canary_share_max: 0.25
+      data_retention_days: 365
+  onboarding:
+    shadow_trades_min: 40
+  security:
+    enforce_no_withdrawal: true
+    require_ip_allowlist: true
+  legal:
+    terms_version: "1.0.0"
+  metrics:
+    plan_cache_ttl_seconds: 300

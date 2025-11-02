@@ -1,5 +1,6 @@
 package com.bottrading.bandit;
 
+import com.bottrading.saas.service.TenantMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -17,9 +18,11 @@ public class BanditMetrics {
   private final Map<String, Counter> pullCounters = new ConcurrentHashMap<>();
   private final Map<String, Counter> blockedCounters = new ConcurrentHashMap<>();
   private final Map<String, AtomicReference<Double>> shareGauges = new ConcurrentHashMap<>();
+  private final TenantMetrics tenantMetrics;
 
-  public BanditMetrics(MeterRegistry meterRegistry) {
+  public BanditMetrics(MeterRegistry meterRegistry, TenantMetrics tenantMetrics) {
     this.meterRegistry = meterRegistry;
+    this.tenantMetrics = tenantMetrics;
   }
 
   public void incrementPull(BanditArmEntity arm) {
@@ -34,7 +37,10 @@ public class BanditMetrics {
     blockedCounters
         .computeIfAbsent(
             reason,
-            key -> meterRegistry.counter("bandit.blocked.count", Tags.of("reason", key)))
+            key ->
+                meterRegistry.counter(
+                    "bandit.blocked.count",
+                    Tags.concat(tenantMetrics.tags(null), Tags.of("reason", key))))
         .increment();
   }
 
@@ -44,14 +50,19 @@ public class BanditMetrics {
             symbol,
             key -> {
               AtomicReference<Double> ref = new AtomicReference<>(0.0);
-              meterRegistry.gauge("bandit.canary.share", Tags.of("symbol", key), ref, AtomicReference::get);
+              meterRegistry.gauge(
+                  "bandit.canary.share",
+                  tenantMetrics.tags(key),
+                  ref,
+                  AtomicReference::get);
               return ref;
             })
         .set(share);
   }
 
   public void registerAlgorithm(String algorithm) {
-    meterRegistry.gauge("bandit.algorithm", Tags.of("value", algorithm), 1);
+    meterRegistry.gauge(
+        "bandit.algorithm", Tags.concat(tenantMetrics.tags(null), Tags.of("value", algorithm)), 1);
   }
 
   private Counter counterFor(BanditArmEntity arm, String metric) {
@@ -61,15 +72,15 @@ public class BanditMetrics {
         k ->
             meterRegistry.counter(
                 metric,
-                Tags.of(
-                    "symbol",
-                    arm.getSymbol(),
-                    "regime",
-                    arm.getRegime(),
-                    "side",
-                    arm.getSide().name(),
-                    "preset",
-                    arm.getPresetId().toString())));
+                Tags.concat(
+                    tenantMetrics.tags(arm.getSymbol()),
+                    Tags.of(
+                        "regime",
+                        arm.getRegime(),
+                        "side",
+                        arm.getSide().name(),
+                        "preset",
+                        arm.getPresetId().toString()))));
   }
 
   private DistributionSummary summaryFor(BanditArmEntity arm, String metric) {
@@ -79,14 +90,15 @@ public class BanditMetrics {
         k ->
             DistributionSummary.builder(metric)
                 .tags(
-                    "symbol",
-                    arm.getSymbol(),
-                    "regime",
-                    arm.getRegime(),
-                    "side",
-                    arm.getSide().name(),
-                    "preset",
-                    arm.getPresetId().toString())
+                    Tags.concat(
+                        tenantMetrics.tags(arm.getSymbol()),
+                        Tags.of(
+                            "regime",
+                            arm.getRegime(),
+                            "side",
+                            arm.getSide().name(),
+                            "preset",
+                            arm.getPresetId().toString())))
                 .register(meterRegistry));
   }
 

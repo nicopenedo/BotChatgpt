@@ -1,5 +1,7 @@
 package com.bottrading.service.risk;
 
+import com.bottrading.saas.service.TenantMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,6 +20,18 @@ public class TradingState {
   private final AtomicBoolean liveEnabled = new AtomicBoolean(false);
   private final AtomicReference<Instant> cooldownUntil = new AtomicReference<>(Instant.EPOCH);
   private final AtomicReference<Mode> mode = new AtomicReference<>(Mode.LIVE);
+  private final MeterRegistry meterRegistry;
+  private final TenantMetrics tenantMetrics;
+
+  public TradingState(MeterRegistry meterRegistry, TenantMetrics tenantMetrics) {
+    this.meterRegistry = meterRegistry;
+    this.tenantMetrics = tenantMetrics;
+  }
+
+  public TradingState() {
+    this.meterRegistry = null;
+    this.tenantMetrics = null;
+  }
 
   public boolean isKillSwitchActive() {
     return killSwitch.get();
@@ -25,6 +39,9 @@ public class TradingState {
 
   public void activateKillSwitch() {
     killSwitch.set(true);
+    if (meterRegistry != null && tenantMetrics != null) {
+      meterRegistry.counter("killswitch.events", tenantMetrics.tags(null)).increment();
+    }
   }
 
   public void deactivateKillSwitch() {

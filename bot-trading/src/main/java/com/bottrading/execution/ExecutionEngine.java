@@ -10,6 +10,7 @@ import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.tca.TcaService;
@@ -52,6 +53,7 @@ public class ExecutionEngine {
   private final ConcurrentMap<String, RunningAverage> slippageAvg = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AtomicReference<Double>> povGauge = new ConcurrentHashMap<>();
   private final AnomalyDetector anomalyDetector;
+  private final TenantMetrics tenantMetrics;
 
   public ExecutionEngine(
       ExecutionPolicy policy,
@@ -61,7 +63,8 @@ public class ExecutionEngine {
       ExecutionProperties properties,
       MeterRegistry meterRegistry,
       Clock clock,
-      AnomalyDetector anomalyDetector) {
+      AnomalyDetector anomalyDetector,
+      TenantMetrics tenantMetrics) {
     this.policy = policy;
     this.orderService = orderService;
     this.binanceClient = binanceClient;
@@ -70,6 +73,7 @@ public class ExecutionEngine {
     this.meterRegistry = meterRegistry;
     this.clock = clock;
     this.anomalyDetector = anomalyDetector;
+    this.tenantMetrics = tenantMetrics;
     this.queueTimes =
         DistributionSummary.builder("exec.queueTime.ms").publishPercentileHistogram().register(meterRegistry);
     this.limitTtl =
@@ -345,7 +349,11 @@ public class ExecutionEngine {
             symbol,
             key -> {
               RunningAverage avg = new RunningAverage();
-              meterRegistry.gauge("exec.slippage.avg_bps", Tags.of("symbol", key), avg.value, AtomicReference::get);
+              meterRegistry.gauge(
+                  "exec.slippage.avg_bps",
+                  tenantMetrics.tags(key),
+                  avg.value,
+                  AtomicReference::get);
               return avg;
             });
     average.update(value);
@@ -357,7 +365,11 @@ public class ExecutionEngine {
             symbol,
             key -> {
               AtomicReference<Double> reference = new AtomicReference<>(0.0);
-              meterRegistry.gauge("exec.pov.participation", Tags.of("symbol", key), reference, AtomicReference::get);
+              meterRegistry.gauge(
+                  "exec.pov.participation",
+                  tenantMetrics.tags(key),
+                  reference,
+                  AtomicReference::get);
               return reference;
             });
     if (target.compareTo(BigDecimal.ZERO) <= 0) {

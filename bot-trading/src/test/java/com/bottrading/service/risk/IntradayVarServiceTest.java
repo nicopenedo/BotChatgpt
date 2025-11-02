@@ -6,6 +6,9 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 import com.bottrading.config.VarProperties;
+import com.bottrading.saas.config.SaasProperties;
+import com.bottrading.saas.repository.TenantRepository;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.model.entity.PositionEntity;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.PositionStatus;
@@ -18,6 +21,7 @@ import com.bottrading.service.risk.IntradayVarService.VarAssessment;
 import com.bottrading.service.risk.IntradayVarService.VarInput;
 import com.bottrading.service.risk.IntradayVarService.VarReason;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.mockito.Mockito;
 
 @ExtendWith(MockitoExtension.class)
 class IntradayVarServiceTest {
@@ -37,8 +42,8 @@ class IntradayVarServiceTest {
   @Mock private NamedParameterJdbcTemplate jdbcTemplate;
 
   private SimpleMeterRegistry meterRegistry;
-
   private IntradayVarService service;
+  private TenantMetrics tenantMetrics;
 
   @BeforeEach
   void setUp() {
@@ -50,13 +55,17 @@ class IntradayVarServiceTest {
     props.setCvarTargetPctPerDay(1.5);
     props.setMcIterations(5000);
     props.setHeavyTails(false);
+    tenantMetrics =
+        new TenantMetrics(
+            Mockito.mock(TenantRepository.class), new SaasProperties(), Clock.systemUTC());
     service = new IntradayVarService(
         props,
         snapshotRepository,
         positionRepository,
         shadowPositionRepository,
         jdbcTemplate,
-        meterRegistry);
+        meterRegistry,
+        tenantMetrics);
     service = org.mockito.Mockito.spy(service);
     when(positionRepository.findByStatus(PositionStatus.OPEN)).thenReturn(List.of());
     when(positionRepository.findByStatus(PositionStatus.OPENING)).thenReturn(List.of());

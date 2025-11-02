@@ -1,6 +1,7 @@
 package com.bottrading.service.risk;
 
 import com.bottrading.config.VarProperties;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.model.entity.PositionEntity;
 import com.bottrading.model.entity.RiskVarSnapshotEntity;
 import com.bottrading.model.entity.ShadowPositionEntity;
@@ -56,6 +57,7 @@ public class IntradayVarService {
   private final ConcurrentMap<MetricKey, DistributionSummary> ratioSummaries =
       new ConcurrentHashMap<>();
   private final AtomicReference<BigDecimal> lastEquity = new AtomicReference<>(BigDecimal.ZERO);
+  private final TenantMetrics tenantMetrics;
 
   public IntradayVarService(
       VarProperties properties,
@@ -63,7 +65,8 @@ public class IntradayVarService {
       PositionRepository positionRepository,
       ShadowPositionRepository shadowPositionRepository,
       NamedParameterJdbcTemplate jdbcTemplate,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      TenantMetrics tenantMetrics) {
     this.properties = properties;
     this.snapshotRepository = snapshotRepository;
     this.positionRepository = positionRepository;
@@ -71,6 +74,7 @@ public class IntradayVarService {
     this.jdbcTemplate = jdbcTemplate;
     this.meterRegistry = meterRegistry;
     this.objectMapper = new ObjectMapper();
+    this.tenantMetrics = tenantMetrics;
   }
 
   public boolean isEnabled() {
@@ -294,10 +298,11 @@ public class IntradayVarService {
             k ->
                 meterRegistry.gauge(
                     "var.cvar_q",
-                    Tags.of(
-                        "symbol", k.symbol(),
-                        "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
-                        "preset", Optional.ofNullable(k.presetKey()).orElse("default")),
+                    Tags.concat(
+                        tenantMetrics.tags(k.symbol()),
+                        Tags.of(
+                            "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
+                            "preset", Optional.ofNullable(k.presetKey()).orElse("default"))),
                     new AtomicReference<>(0.0)));
     ref.set(cvar);
     ratioSummaries
@@ -306,10 +311,11 @@ public class IntradayVarService {
             k ->
                 meterRegistry.summary(
                     "sizing.qty_var_ratio",
-                    Tags.of(
-                        "symbol", k.symbol(),
-                        "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
-                        "preset", Optional.ofNullable(k.presetKey()).orElse("default"))))
+                    Tags.concat(
+                        tenantMetrics.tags(k.symbol()),
+                        Tags.of(
+                            "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
+                            "preset", Optional.ofNullable(k.presetKey()).orElse("default")))))
         .record(ratio);
   }
 
