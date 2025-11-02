@@ -4,12 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Crear cuenta | QuantBot</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
-      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
-      crossorigin="anonymous"
-    />
     <link rel="stylesheet" th:href="@{/css/app.css}" />
   </head>
   <body class="bg-slate-50">
@@ -37,6 +31,12 @@
       <div class="lg:w-1/2">
         <div class="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
           <form th:action="@{/signup}" th:object="${signupForm}" method="post" class="space-y-5">
+            <input
+              type="hidden"
+              th:if="${_csrf != null}"
+              th:name="${_csrf.parameterName}"
+              th:value="${_csrf.token}"
+            />
             <div>
               <label class="form-label" for="tenantName">Nombre del tenant</label>
               <input class="form-input" id="tenantName" th:field="*{tenantName}" type="text" required autofocus />

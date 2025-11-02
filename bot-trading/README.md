@@ -3,6 +3,16 @@
 ## Introducción
 Este proyecto provee un bot de scalping para Binance Spot construido con Spring Boot 3 y Java 21. El objetivo es entregar una base robusta, segura y lista para producción que opere varios símbolos en paralelo (por defecto `BTCUSDT`, `ETHUSDT`, `BNBUSDT`) y pueda adaptarse dinámicamente a distintos regímenes de mercado.
 
+## QA Seguridad UI
+- [ ] Formularios en `/tenant/**` rechazan POST sin token CSRF y aceptan con token válido.
+- [ ] Sitios externos no pueden enviar POST válidos a `/tenant/**` (403 por CSRF).
+- [ ] Usuario con MFA habilitado siempre ve `/mfa` tras login y hasta validar TOTP.
+- [ ] Usuario sin MFA accede directo al dashboard tras autenticarse.
+- [ ] API REST en `/api/**` permanece stateless y sin protección CSRF.
+- [ ] Webhooks en `/webhooks/**` se aceptan sólo si la firma HMAC es válida.
+- [ ] Cookies de sesión entregadas como `Secure`, `HttpOnly` y `SameSite=Lax`.
+- [ ] CSP aplicada restringiendo assets a `self`.
+
 ```
 +-------------------+        +-------------------+        +------------------+
 | REST API (Spring) | <----> | Servicios Trading | <----> | Binance Spot API |

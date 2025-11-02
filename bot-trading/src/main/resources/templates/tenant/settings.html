@@ -37,6 +37,7 @@
             <h2 class="card-title">Notificaciones</h2>
           </div>
           <form class="space-y-4" method="post" th:action="@{/tenant/settings/notifications}" th:object="${settings.notifications}">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <label class="flex items-center gap-3">
               <input class="toggle" type="checkbox" th:field="*{email}" />
               <span>Email</span>
@@ -54,6 +55,7 @@
           <h3 class="card-title">Límites por defecto</h3>
         </div>
         <form class="grid gap-4 md:grid-cols-2" method="post" th:action="@{/tenant/settings/limits}" th:object="${settings.riskLimits}">
+          <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
           <div>
             <label class="form-label" for="dailyLoss">Pérdida diaria máx (%)</label>
             <input class="form-input" id="dailyLoss" th:field="*{maxDailyLoss}" type="number" step="0.1" />

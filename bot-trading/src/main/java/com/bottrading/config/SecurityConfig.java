@@ -1,7 +1,9 @@
 package com.bottrading.config;
 
-import com.bottrading.saas.security.MfaFilter;
+import com.bottrading.saas.security.MfaApiHeaderFilter;
+import com.bottrading.saas.security.MfaUiSessionFilter;
 import com.bottrading.saas.security.TenantContextFilter;
+import com.bottrading.saas.security.TenantUserDetails;
 import com.bottrading.saas.security.TenantUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +20,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -27,15 +33,18 @@ public class SecurityConfig {
 
   private final TenantUserDetailsService userDetailsService;
   private final TenantContextFilter tenantContextFilter;
-  private final MfaFilter mfaFilter;
+  private final MfaApiHeaderFilter mfaApiHeaderFilter;
+  private final MfaUiSessionFilter mfaUiSessionFilter;
 
   public SecurityConfig(
       TenantUserDetailsService userDetailsService,
       TenantContextFilter tenantContextFilter,
-      MfaFilter mfaFilter) {
+      MfaApiHeaderFilter mfaApiHeaderFilter,
+      MfaUiSessionFilter mfaUiSessionFilter) {
     this.userDetailsService = userDetailsService;
     this.tenantContextFilter = tenantContextFilter;
-    this.mfaFilter = mfaFilter;
+    this.mfaApiHeaderFilter = mfaApiHeaderFilter;
+    this.mfaUiSessionFilter = mfaUiSessionFilter;
   }
 
   @Bean
@@ -58,15 +67,25 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults());
-    http.addFilterAfter(tenantContextFilter, BasicAuthenticationFilter.class);
-    http.addFilterAfter(mfaFilter, TenantContextFilter.class);
+    http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterAfter(mfaApiHeaderFilter, TenantContextFilter.class);
     return http.build();
   }
 
   @Bean
   @Order(2)
   public SecurityFilterChain webFilterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable())
+    CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    tokenRepository.setCookiePath("/");
+    tokenRepository.setSecure(true);
+
+    http.securityMatcher("/**")
+        .csrf(
+            csrf ->
+                csrf.csrfTokenRepository(tokenRepository)
+                    .ignoringRequestMatchers(
+                        new AntPathRequestMatcher("/webhooks/**"),
+                        new AntPathRequestMatcher("/actuator/health")))
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
         .authorizeHttpRequests(
             auth ->
@@ -74,24 +93,51 @@ public class SecurityConfig {
                         "/",
                         "/login",
                         "/signup",
+                        "/mfa",
                         "/onboarding/**",
                         "/css/**",
                         "/js/**",
                         "/img/**",
-                        "/webjars/**",
+                        "/webhooks/**",
                         "/static/**",
                         "/public/**")
                     .permitAll()
                     .requestMatchers("/tenant/**").hasAnyRole("OWNER", "ADMIN", "VIEWER")
                     .anyRequest()
-                    .authenticated())
+                    .denyAll())
         .formLogin(
             form ->
                 form.loginPage("/login")
-                    .defaultSuccessUrl("/tenant/dashboard", true)
+                    .successHandler(
+                        (request, response, authentication) -> {
+                          Object principal = authentication.getPrincipal();
+                          if (principal instanceof TenantUserDetails details
+                              && details.isMfaEnabled()) {
+                            request.getSession(true).setAttribute("mfaVerified", Boolean.FALSE);
+                            response.sendRedirect("/mfa");
+                          } else {
+                            response.sendRedirect("/tenant/dashboard");
+                          }
+                        })
                     .permitAll())
         .logout(logout -> logout.logoutUrl("/logout").logoutSuccessUrl("/login?logout").permitAll())
+        .headers(
+            headers ->
+                headers
+                    .contentSecurityPolicy(
+                        csp ->
+                            csp.policyDirectives(
+                                "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'"))
+                    .frameOptions(frame -> frame.sameOrigin())
+                    .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true))
+                    .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
+                    .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "geolocation=()")))
+        .requiresChannel(channel -> channel.anyRequest().requiresSecure())
         .httpBasic(Customizer.withDefaults());
+
+    http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterAfter(mfaUiSessionFilter, UsernamePasswordAuthenticationFilter.class);
+
     return http.build();
   }
 

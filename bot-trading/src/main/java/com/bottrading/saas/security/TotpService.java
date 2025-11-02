@@ -11,16 +11,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TotpValidator {
+public class TotpService {
 
-  private static final Logger log = LoggerFactory.getLogger(TotpValidator.class);
+  private static final Logger log = LoggerFactory.getLogger(TotpService.class);
   private final TimeBasedOneTimePasswordGenerator generator;
 
-  public TotpValidator() {
+  public TotpService() {
     this.generator = new TimeBasedOneTimePasswordGenerator(Duration.ofSeconds(30));
   }
 
-  public boolean isValid(String secret, String code) {
+  public boolean verify(String secret, String code) {
     if (secret == null || code == null || code.isBlank()) {
       return false;
     }
