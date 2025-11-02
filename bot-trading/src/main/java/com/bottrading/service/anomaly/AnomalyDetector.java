@@ -1,6 +1,7 @@
 package com.bottrading.service.anomaly;
 
 import com.bottrading.config.AnomalyProperties;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.risk.RiskFlag;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,18 +41,21 @@ public class AnomalyDetector {
   private final ConcurrentMap<MetricKey, RollingWindow> windows = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, SymbolState> states = new ConcurrentHashMap<>();
   private final ConcurrentMap<MetricKey, AtomicReference<Double>> metricGauges = new ConcurrentHashMap<>();
+  private final TenantMetrics tenantMetrics;
 
   public AnomalyDetector(
       AnomalyProperties properties,
       MeterRegistry meterRegistry,
       AnomalyAlertPublisher alertPublisher,
       AnomalyRiskAdapter riskAdapter,
-      Clock clock) {
+      Clock clock,
+      TenantMetrics tenantMetrics) {
     this.properties = properties;
     this.meterRegistry = meterRegistry;
     this.alertPublisher = alertPublisher;
     this.riskAdapter = riskAdapter;
     this.clock = clock;
+    this.tenantMetrics = tenantMetrics;
   }
 
   public void recordSlippage(String symbol, double value) {
@@ -191,7 +195,9 @@ public class AnomalyDetector {
     Counter counter =
         meterRegistry.counter(
             "anomaly.alerts",
-            Tags.of("symbol", symbol, "type", metric.id(), "severity", severity.name()));
+            Tags.concat(
+                tenantMetrics.tags(symbol),
+                Tags.of("type", metric.id(), "severity", severity.name())));
     counter.increment();
     alertPublisher.publish(
         new AnomalyNotification(

@@ -3,6 +3,8 @@ package com.bottrading.service.anomaly;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bottrading.config.AnomalyProperties;
+import com.bottrading.saas.config.SaasProperties;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.risk.RiskFlag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
@@ -13,16 +15,21 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import com.bottrading.saas.repository.TenantRepository;
 
 class AnomalyDetectorTest {
 
   private static final Clock CLOCK = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
 
   private SimpleMeterRegistry meterRegistry;
+  private TenantMetrics tenantMetrics;
 
   @BeforeEach
   void setup() {
     meterRegistry = new SimpleMeterRegistry();
+    tenantMetrics =
+        new TenantMetrics(Mockito.mock(TenantRepository.class), new SaasProperties(), CLOCK);
   }
 
   @Test
@@ -40,7 +47,7 @@ class AnomalyDetectorTest {
     StubPublisher publisher = new StubPublisher();
     StubRiskAdapter riskAdapter = new StubRiskAdapter();
     AnomalyDetector detector =
-        new AnomalyDetector(properties, meterRegistry, publisher, riskAdapter, CLOCK);
+        new AnomalyDetector(properties, meterRegistry, publisher, riskAdapter, CLOCK, tenantMetrics);
 
     double[] baseline = {1.0, 1.1, 0.9, 1.05, 0.95, 1.02, 0.97};
     for (double sample : baseline) {
@@ -72,7 +79,7 @@ class AnomalyDetectorTest {
     StubPublisher publisher = new StubPublisher();
     StubRiskAdapter riskAdapter = new StubRiskAdapter();
     AnomalyDetector detector =
-        new AnomalyDetector(properties, meterRegistry, publisher, riskAdapter, CLOCK);
+        new AnomalyDetector(properties, meterRegistry, publisher, riskAdapter, CLOCK, tenantMetrics);
 
     for (int i = 0; i < 20; i++) {
       detector.recordApiCall("BTCUSDT", 80, true);

@@ -1,61 +1,78 @@
 package com.bottrading.config;
 
+import com.bottrading.saas.security.MfaFilter;
+import com.bottrading.saas.security.TenantContextFilter;
+import com.bottrading.saas.security.TenantUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+  private final TenantUserDetailsService userDetailsService;
+  private final TenantContextFilter tenantContextFilter;
+  private final MfaFilter mfaFilter;
+
+  public SecurityConfig(
+      TenantUserDetailsService userDetailsService,
+      TenantContextFilter tenantContextFilter,
+      MfaFilter mfaFilter) {
+    this.userDetailsService = userDetailsService;
+    this.tenantContextFilter = tenantContextFilter;
+    this.mfaFilter = mfaFilter;
+  }
+
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/market/**")
-                    .hasAnyRole("VIEWER", "READ")
-                    .requestMatchers("/api/reports/**").hasRole("VIEWER")
-                    .requestMatchers("/ui/**").hasRole("VIEWER")
-                    .requestMatchers("/api/trade/**").hasRole("TRADE")
+                auth.requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                    .requestMatchers("/onboarding/**", "/signup", "/public/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/tenant/status").hasAnyRole("OWNER", "ADMIN", "VIEWER")
+                    .requestMatchers(HttpMethod.POST, "/api/tenant/api-keys").hasAnyRole("OWNER", "ADMIN")
+                    .requestMatchers("/api/bots/**").hasAnyRole("OWNER", "ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/pnl/**", "/api/bandit/**", "/api/reports/**", "/api/audit/**")
+                    .hasAnyRole("OWNER", "ADMIN", "VIEWER")
+                    .requestMatchers(HttpMethod.POST, "/api/notifications/test").hasAnyRole("OWNER", "ADMIN")
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults());
+    http.addFilterAfter(tenantContextFilter, BasicAuthenticationFilter.class);
+    http.addFilterAfter(mfaFilter, TenantContextFilter.class);
     return http.build();
   }
 
   @Bean
-  public UserDetailsService users(PasswordEncoder passwordEncoder) {
-    return new InMemoryUserDetailsManager(
-        User.withUsername("viewer")
-            .password(passwordEncoder.encode("viewerPass"))
-            .roles("VIEWER")
-            .build(),
-        User.withUsername("reader")
-            .password(passwordEncoder.encode("readerPass"))
-            .roles("READ")
-            .build(),
-        User.withUsername("trader")
-            .password(passwordEncoder.encode("traderPass"))
-            .roles("READ", "VIEWER", "TRADE")
-            .build(),
-        User.withUsername("admin")
-            .password(passwordEncoder.encode("adminPass"))
-            .roles("READ", "VIEWER", "TRADE", "ADMIN")
-            .build());
+  public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration)
+      throws Exception {
+    return configuration.getAuthenticationManager();
+  }
+
+  @Bean
+  public DaoAuthenticationProvider daoAuthenticationProvider() {
+    DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+    provider.setPasswordEncoder(passwordEncoder());
+    provider.setUserDetailsService(userDetailsService);
+    provider.setHideUserNotFoundExceptions(false);
+    return provider;
   }
 
   @Bean

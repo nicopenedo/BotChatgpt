@@ -7,6 +7,9 @@ import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.saas.config.SaasProperties;
+import com.bottrading.saas.repository.TenantRepository;
+import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.tca.TcaService;
 import com.bottrading.service.trading.OrderService;
@@ -38,6 +41,7 @@ class ExecutionEngineIntegrationTest {
   private Clock clock;
   private ExecutionEngine engine;
   private TradingProps tradingProps;
+  private TenantMetrics tenantMetrics;
 
   @BeforeEach
   void setup() {
@@ -49,7 +53,18 @@ class ExecutionEngineIntegrationTest {
     tradingProps = new TradingProps();
     tcaService = new TcaService(tradingProps, meterRegistry, mock(com.bottrading.repository.TradeFillRepository.class));
     clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
-    engine = new ExecutionEngine(policy, orderService, binanceClient, tcaService, properties, meterRegistry, clock);
+    tenantMetrics = new TenantMetrics(mock(TenantRepository.class), new SaasProperties(), clock);
+    engine =
+        new ExecutionEngine(
+            policy,
+            orderService,
+            binanceClient,
+            tcaService,
+            properties,
+            meterRegistry,
+            clock,
+            mock(com.bottrading.service.anomaly.AnomalyDetector.class),
+            tenantMetrics);
   }
 
   @Test

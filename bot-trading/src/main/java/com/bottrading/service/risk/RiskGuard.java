@@ -4,6 +4,7 @@ import com.bottrading.config.RiskProperties;
 import com.bottrading.config.TradingProps;
 import com.bottrading.model.entity.RiskEventEntity;
 import com.bottrading.repository.RiskEventRepository;
+import com.bottrading.saas.service.TenantMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -37,6 +38,7 @@ public class RiskGuard {
   private final RiskEventRepository riskEventRepository;
   private final Counter stopouts;
   private final IntradayVarService intradayVarService;
+  private final TenantMetrics tenantMetrics;
 
   private final AtomicReference<BigDecimal> equityStart = new AtomicReference<>(BigDecimal.ZERO);
   private final AtomicReference<BigDecimal> equityPeak = new AtomicReference<>(BigDecimal.ZERO);
@@ -69,24 +71,27 @@ public class RiskGuard {
       RiskAction riskAction,
       RiskEventRepository riskEventRepository,
       MeterRegistry meterRegistry,
-      IntradayVarService intradayVarService) {
+      IntradayVarService intradayVarService,
+      TenantMetrics tenantMetrics) {
     this.tradingProperties = tradingProperties;
     this.riskProperties = riskProperties;
     this.tradingState = tradingState;
     this.riskAction = riskAction;
     this.riskEventRepository = riskEventRepository;
-    this.stopouts = meterRegistry.counter("risk.stopouts", Tags.empty());
+    this.stopouts = meterRegistry.counter("risk.stopouts", tenantMetrics.tags(tradingProperties.getSymbol()));
     this.intradayVarService = intradayVarService;
-    meterRegistry.gauge("risk.equity", Tags.empty(), currentEquity, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.daily_pnl", Tags.empty(), dailyPnl, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.dd_max", Tags.empty(), maxDrawdownPct, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.api_error_rate", Tags.empty(), apiErrorRate, ref -> ref.get());
-    meterRegistry.gauge("risk.ws_reconnects", Tags.empty(), wsReconnectGauge, AtomicInteger::get);
-    meterRegistry.gauge("bot.mode", Tags.empty(), modeGauge, AtomicInteger::get);
-    meterRegistry.gauge("risk.market_data_stale", Tags.empty(), marketDataGauge, AtomicInteger::get);
+    this.tenantMetrics = tenantMetrics;
+    Tags tags = tenantMetrics.tags(tradingProperties.getSymbol());
+    meterRegistry.gauge("risk.equity", tags, currentEquity, ref -> ref.get().doubleValue());
+    meterRegistry.gauge("risk.daily_pnl", tags, dailyPnl, ref -> ref.get().doubleValue());
+    meterRegistry.gauge("risk.dd_max", tags, maxDrawdownPct, ref -> ref.get().doubleValue());
+    meterRegistry.gauge("risk.api_error_rate", tags, apiErrorRate, ref -> ref.get());
+    meterRegistry.gauge("risk.ws_reconnects", tags, wsReconnectGauge, AtomicInteger::get);
+    meterRegistry.gauge("bot.mode", tags, modeGauge, AtomicInteger::get);
+    meterRegistry.gauge("risk.market_data_stale", tags, marketDataGauge, AtomicInteger::get);
     meterRegistry.gauge(
         "risk.daily_loss.limit_pct",
-        Tags.empty(),
+        tags,
         riskProperties,
         props -> props.getMaxDailyLossPct() != null ? props.getMaxDailyLossPct().doubleValue() : 0.0);
     updateModeGauge();

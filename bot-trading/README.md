@@ -29,6 +29,56 @@ Este proyecto provee un bot de scalping para Binance Spot construido con Spring 
 - **Drift & Health Watchdog**: compara live vs shadow/expected, aplica degradaciones automáticas y pausa si hay problemas de conectividad/API.
 - **TCA Service**: registra slippage en bps, colas y recomienda LIMIT/MARKET según condiciones reales.
 
+## SaaS multi-tenant "Bots as a Service"
+
+La plataforma incorpora una capa completa SaaS para ofrecer los bots a clientes finales sin custodiar fondos. Cada tenant opera en su propia cuenta del exchange (API key sin permisos de retiro y con **IP allowlist**), mantiene aislamiento a nivel de base de datos (RLS) y cuenta con auditoría WORM por cada acción relevante.
+
+### Onboarding 1-click
+
+1. **Signup** (`POST /api/signup`): crea el tenant, usuario OWNER y exige aceptar Términos & Declaración de Riesgo (`terms_acceptance`).
+2. **Checkout** (Stripe o Mercado Pago): los webhooks `/api/billing/webhook/*` actualizan `tenant_billing` y activan el plan.
+3. **Carga de API key** (`POST /api/tenant/api-keys`): valida permisos (sin retiro) y enforcea allowlist.
+4. **Shadow**: los bots arrancan en modo shadow por defecto; la promoción a live se gobierna por `ShadowPromoterService` y las métricas declaradas (`PF ≥ 1`, MaxDD < 8%, trades ≥ 40).
+5. **Live**: al promover, se aplican límites conservadores por plan (bots, símbolos, canary share, trades/día) y kill-switch preconfigurado.
+
+### Planes y límites
+
+| Plan | Bots | Símbolos | Canary share | Data retention | Alertas |
+|------|------|----------|--------------|----------------|---------|
+| Starter | 1 | 1 | 10% | 90 días | Email |
+| Pro | 5 | 3 | 25% | 365 días | Email + Telegram/Discord |
+
+Las restricciones se almacenan en `tenant_limits` y `LimitsGuardService` bloquea aperturas cuando se excede `max_bots`, `max_symbols`, `max_trades_per_day` o el `canary_share_max` configurado.
+
+### Panel cliente (Thymeleaf)
+
+- `/ui/tenant`: tablero con estado LIVE/SHADOW/PAUSED, P&L diario/mensual, MaxDD, VaR/CVaR, bandit share y alertas activas.
+- Gestión de bots (`/api/bots/{id}/mode/{SHADOW|LIVE|PAUSED}`) con validación de KPIs antes de promover.
+- Límites dinámicos (`/api/bots/{id}/limits`) para VaR, MaxDD y cuota canary.
+- Reportes descargables (`/api/reports/monthly?yyyymm=`) generan CSV + PDF en `reports/tenant/<tenant>/<yyyy>/<mm>/`.
+- Auditoría filtrable (`/api/audit?from=&to=&type=`) respaldada por la tabla WORM `audit_event`.
+
+### Billing y success fee
+
+- `tenant_billing` registra proveedor (`stripe|mp`), estado de suscripción y High-Water Mark (`hwm_pnl_net`).
+- Webhooks idempotentes para `invoice.paid/failed` y `subscription.updated/canceled` controlan el estado del tenant (`ACTIVE`, `SUSPENDED`).
+- Success fee opcional (`applySuccessFee`) calcula `(pnl_mes - hwm) · rate` (10–15%), actualiza el HWM y emite auditoría.
+
+### Seguridad y gobernanza
+
+- **RBAC** OWNER/ADMIN/VIEWER con autenticación básica + MFA opcional (`X-TOTP`).
+- API keys cifradas (AES-256 GCM via `SecretEncryptionService` + master key KMS) y jamás expuestas en logs.
+- `TenantContextFilter` aplica `SET app.current_tenant` por conexión; Row Level Security garantiza aislamiento entre tenants.
+- Métricas Micrometer etiquetadas con `{tenant, plan, symbol}` (`risk.daily_pnl`, `var.cvar_q`, `exec.slippage.avg_bps`, `bandit.pull.count`, `anomaly.alerts`, `killswitch.events`).
+- Auditoría append-only (`audit_event_no_update` trigger) y tracking de Términos/consentimiento (`terms_acceptance`).
+
+### Runbook & operaciones
+
+- **Kill-switch**: `TradingState.activateKillSwitch()` registra `killswitch.events{tenant,plan}` y pausa aperturas. Para resetear, usar `/api/bots/{id}/mode/PAUSED` o `/admin/incidents`.
+- **Billing fallido**: webhook `invoice.failed` → tenant `SUSPENDED`. Restaurar pagando y verificando `tenant_billing.status=paid`.
+- **Shadow sin promoción**: revisar `/api/bandit/stats` y reportes shadow (PF, MaxDD, slippage). Ajustar presets o ampliar ventana `shadow_trades_min`.
+- **Incidentes 429 / WS down**: `TenantNotificationService` genera alertas email/Telegram/Discord y las registra en `audit_event`. Consultar `risk.api_error_rate` y `anomaly.alerts` etiquetadas por tenant.
+
 ### Dependencias Maven
 
 El repositorio incluye un `.mvn/settings.xml` para forzar el mirror `repo1.maven.org`. Si tu entorno corporativo bloquea Maven

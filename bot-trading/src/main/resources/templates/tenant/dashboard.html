@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <title>Tenant Control Panel</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" />
+  </head>
+  <body>
+    <section>
+      <h1 th:text="${status != null} ? ${status.plan} + ' account' : 'Account'">Account</h1>
+      <p th:if="${status != null}">
+        <strong>Status:</strong> <span th:text="${status.status}"></span><br />
+        <strong>Created:</strong> <span th:text="${status.createdAt}"></span>
+      </p>
+    </section>
+    <section>
+      <h2>KPIs</h2>
+      <table>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+        </tr>
+        <tr th:each="entry : ${status.kpis}">
+          <td th:text="${entry.key}"></td>
+          <td th:text="${entry.value}"></td>
+        </tr>
+      </table>
+    </section>
+    <section>
+      <h2>Feature Flags</h2>
+      <ul>
+        <li th:each="entry : ${status.featureFlags}" th:text="${entry.key} + ' → ' + ${entry.value}"></li>
+      </ul>
+    </section>
+    <section>
+      <h2>Alerts</h2>
+      <p th:text="'Daily PnL: ' + ${alerts['dailyPnl']}"></p>
+      <p th:text="'Max Drawdown: ' + ${alerts['maxDd']}"></p>
+    </section>
+  </body>
+</html>
