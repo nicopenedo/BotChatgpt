@@ -4,12 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Onboarding | QuantBot</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
-      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
-      crossorigin="anonymous"
-    />
     <link rel="stylesheet" th:href="@{/css/app.css}" />
   </head>
   <body class="bg-slate-950 text-slate-50">
@@ -39,6 +33,7 @@
       <section class="grid gap-8 rounded-3xl border border-slate-800/60 bg-slate-900/60 p-8 backdrop-blur">
         <div th:switch="${currentStep}">
           <form th:case="1" th:object="${profileForm}" method="post" th:action="@{/onboarding/profile}" class="grid gap-6">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div>
               <h2 class="text-xl font-semibold">Paso 1 · Perfil y plan</h2>
               <p class="text-sm text-slate-400">Seleccioná el plan inicial y confirmá la aceptación de términos.</p>
@@ -70,6 +65,7 @@
             </div>
           </form>
           <form th:case="2" th:object="${apiKeysForm}" method="post" th:action="@{/onboarding/api-keys}" class="grid gap-6">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div>
               <h2 class="text-xl font-semibold">Paso 2 · API keys</h2>
               <p class="text-sm text-slate-400">Conectá Binance (testnet disponible) y bloqueá retiros por seguridad.</p>
@@ -93,6 +89,7 @@
             </div>
           </form>
           <form th:case="3" th:object="${botForm}" method="post" th:action="@{/onboarding/bot}" class="grid gap-6">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div>
               <h2 class="text-xl font-semibold">Paso 3 · Creá tu primer bot</h2>
               <p class="text-sm text-slate-400">Elegí símbolo, intervalo y un preset recomendado para arrancar.</p>

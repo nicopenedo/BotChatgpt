@@ -12,12 +12,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-public class MfaFilter extends OncePerRequestFilter {
+public class MfaApiHeaderFilter extends OncePerRequestFilter {
 
-  private final TotpValidator totpValidator;
+  private final TotpService totpService;
 
-  public MfaFilter(TotpValidator totpValidator) {
-    this.totpValidator = totpValidator;
+  public MfaApiHeaderFilter(TotpService totpService) {
+    this.totpService = totpService;
   }
 
   @Override
@@ -29,7 +29,7 @@ public class MfaFilter extends OncePerRequestFilter {
       Object principal = authentication.getPrincipal();
       if (principal instanceof TenantUserDetails details && details.isMfaEnabled()) {
         String totp = request.getHeader("X-TOTP");
-        if (!totpValidator.isValid(details.getMfaSecret(), totp)) {
+        if (!totpService.verify(details.getMfaSecret(), totp)) {
           response.setStatus(HttpStatus.UNAUTHORIZED.value());
           response.getWriter().write("Invalid or missing MFA token");
           return;

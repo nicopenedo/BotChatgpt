@@ -4,12 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ingresar | QuantBot</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
-      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
-      crossorigin="anonymous"
-    />
     <link rel="stylesheet" th:href="@{/css/app.css}" />
   </head>
   <body class="flex min-h-screen items-center justify-center bg-slate-950 bg-[radial-gradient(circle_at_top,_#1e293b,_#020617)] px-4 text-slate-50">
@@ -22,6 +16,7 @@
         </div>
       </div>
       <form th:action="@{/login}" method="post" class="space-y-5">
+        <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <div>
           <label class="form-label" for="username">Email</label>
           <input class="form-input" id="username" name="username" type="email" required autocomplete="email" />

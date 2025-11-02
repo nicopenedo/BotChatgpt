@@ -75,17 +75,21 @@
         <td th:text="${entry.window}"></td>
         <td class="actions">
             <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/activate'}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <input type="hidden" name="mode" value="full" />
                 <button type="submit">Activate</button>
             </form>
             <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/activate'}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <input type="hidden" name="mode" value="canary" />
                 <button type="submit">Canary</button>
             </form>
             <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/retire'}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <button type="submit">Retire</button>
             </form>
             <form th:action="@{'/ui/presets/' + ${entry.preset.id} + '/rollback'}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                 <button type="submit">Rollback</button>
             </form>
         </td>
