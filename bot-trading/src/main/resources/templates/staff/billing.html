@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Billing</title>
+  </head>
+  <body>
+    <h1>Estados de Billing</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Tenant</th>
+          <th>Plan</th>
+          <th>Estado</th>
+          <th>Provider</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="record : ${records}">
+          <td th:text="${record.tenantId}">tenant</td>
+          <td th:text="${record.plan}">plan</td>
+          <td th:text="${record.billingState}">estado</td>
+          <td th:text="${record.provider}">prov</td>
+        </tr>
+      </tbody>
+    </table>
+    <form method="post" th:action="@{/staff/billing/replay}">
+      <label>Reprocesar evento:</label>
+      <input type="text" name="eventId" />
+      <button type="submit">Reprocesar</button>
+    </form>
+  </body>
+</html>

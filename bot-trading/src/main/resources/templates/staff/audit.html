@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Auditoría</title>
+  </head>
+  <body>
+    <h1>Eventos de Webhook</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Procesado</th>
+          <th>Tipo</th>
+          <th>Evento</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr th:each="event : ${webhooks}">
+          <td th:text="${event.processedAt}">fecha</td>
+          <td th:text="${event.type}">tipo</td>
+          <td th:text="${event.eventId}">id</td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

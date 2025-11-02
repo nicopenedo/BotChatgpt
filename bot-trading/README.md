@@ -60,6 +60,94 @@ La plataforma incorpora una capa completa SaaS para ofrecer los bots a clientes 
 
 Las restricciones se almacenan en `tenant_limits` y `LimitsGuardService` bloquea aperturas cuando se excede `max_bots`, `max_symbols`, `max_trades_per_day` o el `canary_share_max` configurado.
 
+### Cuenta, privacidad y portabilidad
+
+- **Eliminar cuenta**: la vista `/ui/tenant/account/delete` requiere confirmación doble, contraseña y TOTP si el usuario tiene MFA. Se registra la solicitud, se marca el tenant con `deletion_requested_at`/`purge_after` y el job `TenantAccountCleanupJob` lo purga físicamente entre 24–72h (respetando las retenciones legales definidas en `saas.legal`).
+- **Exportar datos**: el botón `Exportar` genera un token firmado vía `TenantAccountService.createExportToken`. La descarga se sirve desde `/tenant/account/export?token=` con streaming de un ZIP (`trades.csv`, `fills.csv`, `executions.json`, `reports/*.pdf|html`). También se exponen rutas directas `/tenant/exports/trades.csv`, `/fills.csv`, `/executions.json`.
+- **Auditoría**: todos los eventos (`solicitud`, `descarga`, `borrado`) quedan registrados en `audit_event` con claves `tenant.account.*`.
+
+Variables relevantes (`application.yml` / entorno):
+
+```yaml
+saas:
+  legal:
+    export-token-ttl-minutes: 15   # Validez de los enlaces de descarga
+    deletion-min-hours: 24         # Ventana mínima antes del purge
+    deletion-max-hours: 72         # Ventana máxima antes del purge
+```
+
+### Límites de seguridad por plan
+
+- El plan Starter incluye límites defensivos: `maxDailyDrawdownPct`, `maxConcurrentPositions`, `maxDailyTrades` y `canaryPct` (10%). Estas columnas viven en `tenant_limits` y las consume `LimitsGuardService`/`RiskGuard`.
+- El botón **Pause All** (`/tenant/risk/pause-all`) pausa las nuevas entradas pero permite cerrar posiciones. Requiere confirmación doble + TOTP y actualiza `tenant_settings.trading_paused`.
+- El estado se refleja en auditoría (`tenant.trading.paused`/`tenant.trading.resumed`) y en la UI.
+
+### Billing robusto
+
+- Estados soportados: `ACTIVE`, `GRACE`, `PAST_DUE`, `DOWNGRADED` en `TenantBillingEntity`.
+- Webhooks (`/api/billing/webhook/{provider}`) son idempotentes con `BillingWebhookEventEntity` (`event_id`, `signature`, `processed_at`). Duplicados se rechazan (HTTP 409) y se registra auditoría.
+- Ante fallos de cobro se entra en `GRACE` durante `saas.billing.grace-days`; luego pasa a `PAST_DUE` y se degrada automáticamente al plan Starter/Free (sin bloquear cierres ni exportaciones).
+- CLI operativo (`java -jar bot-trading.jar billing ...`):
+  - `billing replay-webhook --event-id <id>`: reprocesa un evento.
+  - `billing force-state --tenant <uuid> --state ACTIVE|GRACE|PAST_DUE|DOWNGRADED`.
+  - `billing history --tenant <uuid>`: muestra transiciones.
+
+### Consentimiento versionado
+
+- Cada activación/modificación de bot exige consentimiento vigente de Términos y Declaración de Riesgo.
+- Los hashes/versiones actuales (`saas.legal.terms-version`, `saas.legal.risk-version`) se guardan en `terms_acceptance` junto a `consented_at` e IP. Si falta consentimiento se bloquea la activación (HTTP 412).
+- Al actualizar versiones, forzar nuevo consentimiento mostrando los textos en la UI (panel de bots).
+
+### Geo-block y sanciones
+
+- `SanctionsFilter` bloquea peticiones cuando el país de la IP (`GeoLocationService`) o de facturación coinciden con `saas.legal.sanctioned-countries`.
+- Las APIs (`/api/**`) devuelven 451, las vistas redirigen a `/blocked` (template `templates/blocked.html`). Todas las denegaciones quedan en auditoría (`geo.blocked`).
+
+```yaml
+saas:
+  legal:
+    sanctioned-countries:
+      - CU
+      - IR
+      - SY
+```
+
+### Portal interno y RBAC
+
+- Staff accede vía SSO OAuth2 + MFA (configurar `spring.security.oauth2.client.*`).
+- Roles (`StaffRole`): `SUPPORT_READ`, `OPS_ACTIONS`, `FINANCE`. Se aplican a vistas Thymeleaf en `templates/staff/` (tenants, planes, auditoría, pause-all, webhooks, incidentes).
+- Toda acción staff se audita y exige MFA confirmado.
+
+### Reportes y exportes recurrentes
+
+- `TenantReportScheduler` genera reporte mensual HTML (Thymeleaf `report/report_monthly_template.html`) y lo convierte a PDF (FlyingSaucer/iText). Los archivos viven bajo `reports/tenant/<tenant>/<yyyy>/<mm>/`.
+- Endpoints auxiliares: `/tenant/exports/trades.csv`, `/fills.csv`, `/executions.json`.
+- `TenantDataExportService` reutiliza lógica para CSV/JSON y ZIP de portabilidad.
+
+### QA y pruebas
+
+Pruebas recomendadas (JUnit 5 + Spring Test):
+
+- `TenantAccountApiIntegrationTest`: validar borrado (soft-delete + auditoría) y exportación (200 OK con token válido, 401/403/404 en casos negativos).
+- Billing webhook idempotente: simular eventos duplicados y transición `ACTIVE → GRACE → PAST_DUE → DOWNGRADED`.
+- Consentimiento: bloquear activación de bots si faltan hashes vigentes y permitir tras aceptarlos.
+- Geo-block: mockear `GeoLocationService` para países sancionados y verificar respuesta 451/redirección.
+- Pause all: asegurar que `LimitsGuardService`/`RiskGuard` bloquean nuevas entradas pero permiten cierres.
+- Unit tests: generadores CSV/ZIP, firma de webhooks, verificación TOTP.
+
+### Variables de entorno clave
+
+| Variable | Descripción |
+|----------|-------------|
+| `SAAS_BILLING_GRACE_DAYS` | Días de gracia antes de degradar plan. |
+| `SAAS_LEGAL_TERMS_VERSION` | Versionado de Términos para consentimiento. |
+| `SAAS_LEGAL_RISK_VERSION` | Versionado de Riesgos para consentimiento. |
+| `SAAS_LEGAL_SANCTIONED_COUNTRIES` | Lista separada por comas de países bloqueados. |
+| `SAAS_LEGAL_EXPORT_TOKEN_TTL_MINUTES` | TTL de enlaces de exportación. |
+| `SAAS_LEGAL_DELETION_MIN_HOURS` / `SAAS_LEGAL_DELETION_MAX_HOURS` | Ventana de purge físico. |
+
+> Ajustar las variables vía `application.yml`, `application-*.yml` o variables de entorno (Spring Boot convierte guiones a camelCase automáticamente).
+
 ### Panel cliente (Thymeleaf)
 
 - `/ui/tenant`: tablero con estado LIVE/SHADOW/PAUSED, P&L diario/mensual, MaxDD, VaR/CVaR, bandit share y alertas activas.

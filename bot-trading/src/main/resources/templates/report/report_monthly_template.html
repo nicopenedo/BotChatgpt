@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title th:text="${tenant.name} + ' - Informe mensual'">Informe Mensual</title>
+    <style>
+      body {
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        color: #1f2933;
+        margin: 2rem;
+      }
+      h1 {
+        font-size: 24px;
+        margin-bottom: 1rem;
+      }
+      .meta {
+        margin-bottom: 1.5rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border: 1px solid #d2d6dc;
+        padding: 0.5rem 0.75rem;
+      }
+      th {
+        background-color: #f4f5f7;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Resumen mensual</h1>
+    <div class="meta">
+      <p><strong>Tenant:</strong> <span th:text="${tenant.name}">Tenant</span></p>
+      <p><strong>Plan:</strong> <span th:text="${tenant.plan}">Plan</span></p>
+      <p><strong>Estado:</strong> <span th:text="${tenant.status}">Estado</span></p>
+      <p><strong>Periodo:</strong> <span th:text="${period}">2024-01</span></p>
+      <p><strong>Generado:</strong> <span th:text="${#temporals.format(generatedAt, 'yyyy-MM-dd HH:mm:ss')}">2024-01-02</span></p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Operaciones Totales</td>
+          <td>0</td>
+        </tr>
+        <tr>
+          <td>PnL Neto</td>
+          <td>0</td>
+        </tr>
+        <tr>
+          <td>Drawdown Máximo</td>
+          <td>0%</td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

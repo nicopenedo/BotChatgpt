@@ -6,6 +6,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -35,6 +37,34 @@ public class TenantEntity {
 
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
+
+  @Column(name = "deletion_requested_at")
+  private Instant deletionRequestedAt;
+
+  @Column(name = "purge_after")
+  private Instant purgeAfter;
+
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
+  @Column(name = "billing_country")
+  private String billingCountry;
+
+  @PrePersist
+  public void prePersist() {
+    Instant now = Instant.now();
+    if (createdAt == null) {
+      createdAt = now;
+    }
+    if (updatedAt == null) {
+      updatedAt = now;
+    }
+  }
+
+  @PreUpdate
+  public void preUpdate() {
+    updatedAt = Instant.now();
+  }
 
   public UUID getId() {
     return id;
@@ -90,5 +120,37 @@ public class TenantEntity {
 
   public void setUpdatedAt(Instant updatedAt) {
     this.updatedAt = updatedAt;
+  }
+
+  public Instant getDeletionRequestedAt() {
+    return deletionRequestedAt;
+  }
+
+  public void setDeletionRequestedAt(Instant deletionRequestedAt) {
+    this.deletionRequestedAt = deletionRequestedAt;
+  }
+
+  public Instant getPurgeAfter() {
+    return purgeAfter;
+  }
+
+  public void setPurgeAfter(Instant purgeAfter) {
+    this.purgeAfter = purgeAfter;
+  }
+
+  public Instant getDeletedAt() {
+    return deletedAt;
+  }
+
+  public void setDeletedAt(Instant deletedAt) {
+    this.deletedAt = deletedAt;
+  }
+
+  public String getBillingCountry() {
+    return billingCountry;
+  }
+
+  public void setBillingCountry(String billingCountry) {
+    this.billingCountry = billingCountry;
   }
 }

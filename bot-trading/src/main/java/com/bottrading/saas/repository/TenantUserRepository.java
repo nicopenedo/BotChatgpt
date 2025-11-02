@@ -12,4 +12,6 @@ public interface TenantUserRepository extends JpaRepository<TenantUserEntity, UU
   List<TenantUserEntity> findByTenantId(UUID tenantId);
 
   Optional<TenantUserEntity> findByEmail(String email);
+
+  void deleteByTenantId(UUID tenantId);
 }

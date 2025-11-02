@@ -101,7 +101,11 @@ public class OnboardingService {
     limits.setMaxBots(planConfig.getMaxBots());
     limits.setMaxSymbols(planConfig.getMaxSymbols());
     limits.setCanaryShareMax(planConfig.getCanaryShareMax());
-    limits.setMaxTradesPerDay(Math.max(25, planConfig.getMaxBots() * 50));
+    int maxDailyTrades = planConfig.getMaxDailyTrades() > 0 ? planConfig.getMaxDailyTrades() : Math.max(25, planConfig.getMaxBots() * 50);
+    limits.setMaxTradesPerDay(maxDailyTrades);
+    limits.setMaxDailyDrawdownPct(planConfig.getMaxDailyDrawdownPct());
+    limits.setMaxConcurrentPositions(planConfig.getMaxConcurrentPositions());
+    limits.setCanaryPct(planConfig.getCanaryPct());
     limits.setDataRetentionDays(planConfig.getDataRetentionDays());
     limits.setUpdatedAt(now);
     tenantLimitsRepository.save(limits);
@@ -109,8 +113,9 @@ public class OnboardingService {
     TermsAcceptanceEntity terms = new TermsAcceptanceEntity();
     terms.setTenantId(tenant.getId());
     terms.setUserId(owner.getId());
-    terms.setVersion(request.getTermsVersion());
-    terms.setAcceptedAt(now);
+    terms.setTermsVersionHash(request.getTermsVersion());
+    terms.setRiskVersionHash(request.getRiskVersion());
+    terms.setConsentedAt(now);
     terms.setIp(request.getIp());
     terms.setUa(request.getUserAgent());
     termsAcceptanceRepository.save(terms);
@@ -124,6 +129,7 @@ public class OnboardingService {
     billing.setCustomerId("pending");
     billing.setPlan(request.getPlan().name());
     billing.setStatus("pending_checkout");
+    billing.setBillingState(TenantBillingEntity.BillingState.ACTIVE);
     billing.setHwmPnlNet(java.math.BigDecimal.ZERO);
     billing.setUpdatedAt(now);
     tenantBillingRepository.save(billing);

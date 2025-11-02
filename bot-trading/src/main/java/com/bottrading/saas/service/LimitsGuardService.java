@@ -41,4 +41,19 @@ public class LimitsGuardService {
     TenantLimitsEntity limits = tenantLimitsRepository.findById(tenantId).orElse(null);
     return limits == null || requestedShare.compareTo(limits.getCanaryShareMax()) <= 0;
   }
+
+  public BigDecimal maxDrawdownPct(UUID tenantId) {
+    TenantLimitsEntity limits = tenantLimitsRepository.findById(tenantId).orElse(null);
+    return limits != null ? limits.getMaxDailyDrawdownPct() : BigDecimal.ZERO;
+  }
+
+  public int maxConcurrentPositions(UUID tenantId) {
+    TenantLimitsEntity limits = tenantLimitsRepository.findById(tenantId).orElse(null);
+    return limits != null ? limits.getMaxConcurrentPositions() : Integer.MAX_VALUE;
+  }
+
+  public int maxDailyTrades(UUID tenantId) {
+    TenantLimitsEntity limits = tenantLimitsRepository.findById(tenantId).orElse(null);
+    return limits != null ? limits.getMaxTradesPerDay() : Integer.MAX_VALUE;
+  }
 }

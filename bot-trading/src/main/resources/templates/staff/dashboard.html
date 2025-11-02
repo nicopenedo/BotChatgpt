@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Staff Dashboard</title>
+  </head>
+  <body>
+    <h1>Panel de Staff</h1>
+    <section>
+      <h2>Tenants activos</h2>
+      <ul>
+        <li th:each="tenant : ${tenants}" th:text="${tenant.name}">Tenant</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Planes y estados</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Tenant</th>
+            <th>Plan</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr th:each="billing : ${billing}">
+            <td th:text="${billing.tenantId}">tenant</td>
+            <td th:text="${billing.plan}">Starter</td>
+            <td th:text="${billing.billingState}">ACTIVE</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </body>
+</html>
