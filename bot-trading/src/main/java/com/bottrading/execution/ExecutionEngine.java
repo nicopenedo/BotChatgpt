@@ -6,11 +6,13 @@ import com.bottrading.execution.ExecutionPolicy.MarketPlan;
 import com.bottrading.execution.ExecutionPolicy.OrderPlan;
 import com.bottrading.execution.ExecutionPolicy.PovPlan;
 import com.bottrading.execution.ExecutionPolicy.TwapPlan;
+import com.bottrading.execution.metrics.PovMetrics;
+import com.bottrading.execution.metrics.SlippageMetrics;
 import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
-import com.bottrading.saas.service.TenantMetrics;
+import com.bottrading.saas.security.TenantContext;
 import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.tca.TcaService;
@@ -28,10 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -50,10 +49,9 @@ public class ExecutionEngine {
   private final Clock clock;
   private final DistributionSummary queueTimes;
   private final DistributionSummary limitTtl;
-  private final ConcurrentMap<String, RunningAverage> slippageAvg = new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, AtomicReference<Double>> povGauge = new ConcurrentHashMap<>();
   private final AnomalyDetector anomalyDetector;
-  private final TenantMetrics tenantMetrics;
+  private final SlippageMetrics slippageMetrics;
+  private final PovMetrics povMetrics;
 
   public ExecutionEngine(
       ExecutionPolicy policy,
@@ -64,7 +62,8 @@ public class ExecutionEngine {
       MeterRegistry meterRegistry,
       Clock clock,
       AnomalyDetector anomalyDetector,
-      TenantMetrics tenantMetrics) {
+      SlippageMetrics slippageMetrics,
+      PovMetrics povMetrics) {
     this.policy = policy;
     this.orderService = orderService;
     this.binanceClient = binanceClient;
@@ -73,7 +72,8 @@ public class ExecutionEngine {
     this.meterRegistry = meterRegistry;
     this.clock = clock;
     this.anomalyDetector = anomalyDetector;
-    this.tenantMetrics = tenantMetrics;
+    this.slippageMetrics = slippageMetrics;
+    this.povMetrics = povMetrics;
     this.queueTimes =
         DistributionSummary.builder("exec.queueTime.ms").publishPercentileHistogram().register(meterRegistry);
     this.limitTtl =
@@ -315,7 +315,8 @@ public class ExecutionEngine {
                     .multiply(BigDecimal.valueOf(10000))
                     .doubleValue() * (request.side() == OrderSide.BUY ? 1 : -1);
     if (!Double.isNaN(slippage)) {
-      updateSlippageGauge(request.symbol(), slippage);
+      UUID tenantId = TenantContext.getTenantId();
+      slippageMetrics.record(tenantId, request.symbol(), slippage);
       anomalyDetector.recordSlippage(request.symbol(), slippage);
     }
   }
@@ -343,40 +344,13 @@ public class ExecutionEngine {
     return qty == null ? BigDecimal.ZERO : qty;
   }
 
-  private void updateSlippageGauge(String symbol, double value) {
-    RunningAverage average =
-        slippageAvg.computeIfAbsent(
-            symbol,
-            key -> {
-              RunningAverage avg = new RunningAverage();
-              meterRegistry.gauge(
-                  "exec.slippage.avg_bps",
-                  tenantMetrics.tags(key),
-                  avg.value,
-                  AtomicReference::get);
-              return avg;
-            });
-    average.update(value);
-  }
-
   private void updatePovGauge(String symbol, BigDecimal executed, BigDecimal target) {
-    AtomicReference<Double> ref =
-        povGauge.computeIfAbsent(
-            symbol,
-            key -> {
-              AtomicReference<Double> reference = new AtomicReference<>(0.0);
-              meterRegistry.gauge(
-                  "exec.pov.participation",
-                  tenantMetrics.tags(key),
-                  reference,
-                  AtomicReference::get);
-              return reference;
-            });
     if (target.compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
     double participation = executed.divide(target, 6, RoundingMode.HALF_UP).doubleValue();
-    ref.set(participation);
+    UUID tenantId = TenantContext.getTenantId();
+    povMetrics.update(tenantId, symbol, participation);
   }
 
   private void sleep(long millis) {
@@ -387,16 +361,6 @@ public class ExecutionEngine {
       Thread.sleep(Math.min(millis, 1000));
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-    }
-  }
-
-  private static class RunningAverage {
-    private final AtomicReference<Double> value = new AtomicReference<>(0.0);
-    private final AtomicInteger count = new AtomicInteger();
-
-    void update(double sample) {
-      int newCount = count.updateAndGet(prev -> prev + 1);
-      value.updateAndGet(prev -> prev + (sample - prev) / Math.max(1, newCount));
     }
   }
 

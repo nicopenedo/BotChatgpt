@@ -2,14 +2,14 @@ package com.bottrading.execution;
 
 import com.bottrading.config.ExecutionProperties;
 import com.bottrading.config.TradingProps;
+import com.bottrading.execution.metrics.PovMetrics;
+import com.bottrading.execution.metrics.SlippageMetrics;
 import com.bottrading.model.dto.ExchangeInfo;
 import com.bottrading.model.dto.OrderRequest;
 import com.bottrading.model.dto.OrderResponse;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
-import com.bottrading.saas.config.SaasProperties;
-import com.bottrading.saas.repository.TenantRepository;
-import com.bottrading.saas.service.TenantMetrics;
+import com.bottrading.saas.security.TenantContext;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.tca.TcaService;
 import com.bottrading.service.trading.OrderService;
@@ -20,8 +20,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +43,8 @@ class ExecutionEngineIntegrationTest {
   private Clock clock;
   private ExecutionEngine engine;
   private TradingProps tradingProps;
-  private TenantMetrics tenantMetrics;
+  private SlippageMetrics slippageMetrics;
+  private PovMetrics povMetrics;
 
   @BeforeEach
   void setup() {
@@ -53,7 +56,8 @@ class ExecutionEngineIntegrationTest {
     tradingProps = new TradingProps();
     tcaService = new TcaService(tradingProps, meterRegistry, mock(com.bottrading.repository.TradeFillRepository.class));
     clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
-    tenantMetrics = new TenantMetrics(mock(TenantRepository.class), new SaasProperties(), clock);
+    slippageMetrics = new SlippageMetrics(meterRegistry, properties, clock);
+    povMetrics = new PovMetrics(meterRegistry, properties, clock);
     engine =
         new ExecutionEngine(
             policy,
@@ -64,7 +68,13 @@ class ExecutionEngineIntegrationTest {
             meterRegistry,
             clock,
             mock(com.bottrading.service.anomaly.AnomalyDetector.class),
-            tenantMetrics);
+            slippageMetrics,
+            povMetrics);
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
   }
 
   @Test
@@ -155,6 +165,8 @@ class ExecutionEngineIntegrationTest {
     properties.getPov().setReassessIntervalSec(0);
     ExecutionRequest request = baseRequest(OrderSide.SELL, new BigDecimal("0.2"), ExecutionRequest.Urgency.MEDIUM);
     MarketSnapshot snapshot = new MarketSnapshot(new BigDecimal("100"), 1, 5, 0, new BigDecimal("1"), BigDecimal.valueOf(100));
+    UUID tenantId = UUID.randomUUID();
+    TenantContext.setTenantId(tenantId);
 
     AtomicInteger counter = new AtomicInteger();
     when(orderService.placeOrder(any()))
@@ -183,7 +195,8 @@ class ExecutionEngineIntegrationTest {
     assertThat(result.executedQty()).isEqualByComparingTo("0.2");
     double participation =
         meterRegistry
-            .get("exec.pov.participation")
+            .get("exec.pov.progress")
+            .tag("tenant", tenantId.toString())
             .tag("symbol", request.symbol())
             .gauge()
             .value();

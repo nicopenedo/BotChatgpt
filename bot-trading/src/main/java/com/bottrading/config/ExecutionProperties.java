@@ -10,6 +10,7 @@ public class ExecutionProperties {
   private Limit limit = new Limit();
   private Twap twap = new Twap();
   private Pov pov = new Pov();
+  private Metrics metrics = new Metrics();
 
   public DefaultOrder getDefaultOrder() {
     return defaultOrder;
@@ -41,6 +42,14 @@ public class ExecutionProperties {
 
   public void setPov(Pov pov) {
     this.pov = pov;
+  }
+
+  public Metrics getMetrics() {
+    return metrics;
+  }
+
+  public void setMetrics(Metrics metrics) {
+    this.metrics = metrics;
   }
 
   public static class DefaultOrder {
@@ -141,6 +150,27 @@ public class ExecutionProperties {
 
     public Duration reassessInterval() {
       return Duration.ofSeconds(reassessIntervalSec);
+    }
+  }
+
+  public static class Metrics {
+    private long cleanupMs = Duration.ofMinutes(10).toMillis();
+    private long ttlMs = Duration.ofMinutes(30).toMillis();
+
+    public long getCleanupMs() {
+      return cleanupMs;
+    }
+
+    public void setCleanupMs(long cleanupMs) {
+      this.cleanupMs = cleanupMs;
+    }
+
+    public long getTtlMs() {
+      return ttlMs;
+    }
+
+    public void setTtlMs(long ttlMs) {
+      this.ttlMs = ttlMs;
     }
   }
 }
