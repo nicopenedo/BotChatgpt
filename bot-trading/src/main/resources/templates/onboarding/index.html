@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Onboarding | QuantBot</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
+      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+  </head>
+  <body class="bg-slate-950 text-slate-50">
+    <div class="mx-auto flex min-h-screen max-w-5xl flex-col gap-10 px-6 py-16">
+      <header class="flex items-center justify-between">
+        <a class="flex items-center gap-3" th:href="@{/}">
+          <img class="h-10 w-10" th:src="@{/img/logo.svg}" alt="QuantBot" />
+          <div>
+            <p class="text-xs uppercase tracking-[0.3em] text-emerald-400">Onboarding</p>
+            <h1 class="text-2xl font-semibold">Configura tu mesa cuantitativa</h1>
+          </div>
+        </a>
+        <a class="text-sm font-medium text-emerald-400 hover:text-emerald-300" th:href="@{/login}">Saltar e ir al panel</a>
+      </header>
+      <ol class="flex items-center justify-between gap-4">
+        <li th:each="step : ${steps}" class="flex flex-1 items-center gap-3">
+          <div th:class="${step.completed} ? 'step-circle done' : (${step.current} ? 'step-circle current' : 'step-circle')">
+            <span th:text="${step.order}">1</span>
+          </div>
+          <div>
+            <p class="text-sm font-semibold" th:text="${step.title}">Perfil</p>
+            <p class="text-xs text-slate-400" th:text="${step.description}">Configuración inicial</p>
+          </div>
+          <div class="hidden flex-1 border-t border-dashed border-slate-700 last:hidden sm:block"></div>
+        </li>
+      </ol>
+      <section class="grid gap-8 rounded-3xl border border-slate-800/60 bg-slate-900/60 p-8 backdrop-blur">
+        <div th:switch="${currentStep}">
+          <form th:case="1" th:object="${profileForm}" method="post" th:action="@{/onboarding/profile}" class="grid gap-6">
+            <div>
+              <h2 class="text-xl font-semibold">Paso 1 · Perfil y plan</h2>
+              <p class="text-sm text-slate-400">Seleccioná el plan inicial y confirmá la aceptación de términos.</p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="form-label" for="company">Compañía</label>
+                <input class="form-input" id="company" th:field="*{company}" type="text" required />
+                <p class="form-error" th:if="${#fields.hasErrors('company')}" th:errors="*{company}"></p>
+              </div>
+              <div>
+                <label class="form-label" for="plan">Plan</label>
+                <select class="form-input" id="plan" th:field="*{plan}">
+                  <option value="STARTER">Starter</option>
+                  <option value="PRO">Pro</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-start gap-3">
+              <input class="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900" id="risk" th:field="*{acceptedRisk}" type="checkbox" />
+              <label class="text-sm text-slate-300" for="risk">
+                Confirmo que leí y acepto las políticas de riesgo y los límites de operación.
+              </label>
+            </div>
+            <p class="form-error" th:if="${#fields.hasErrors('acceptedRisk')}" th:errors="*{acceptedRisk}"></p>
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-slate-500">Tiempo estimado · 3 minutos</p>
+              <button class="btn-primary" type="submit">Guardar y continuar</button>
+            </div>
+          </form>
+          <form th:case="2" th:object="${apiKeysForm}" method="post" th:action="@{/onboarding/api-keys}" class="grid gap-6">
+            <div>
+              <h2 class="text-xl font-semibold">Paso 2 · API keys</h2>
+              <p class="text-sm text-slate-400">Conectá Binance (testnet disponible) y bloqueá retiros por seguridad.</p>
+            </div>
+            <div>
+              <label class="form-label" for="apiKey">API Key</label>
+              <input class="form-input" id="apiKey" th:field="*{apiKey}" type="text" required />
+              <p class="form-error" th:if="${#fields.hasErrors('apiKey')}" th:errors="*{apiKey}"></p>
+            </div>
+            <div>
+              <label class="form-label" for="apiSecret">API Secret</label>
+              <input class="form-input" id="apiSecret" th:field="*{apiSecret}" type="password" required />
+              <p class="form-error" th:if="${#fields.hasErrors('apiSecret')}" th:errors="*{apiSecret}"></p>
+            </div>
+            <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+              Activá el modo <strong>Testnet</strong> para validar sin riesgo. Recordá dejar deshabilitados los permisos de retiro.
+            </div>
+            <div class="flex items-center justify-between">
+              <a class="btn-secondary" th:href="@{/onboarding?step=1}">Volver</a>
+              <button class="btn-primary" type="submit">Guardar y continuar</button>
+            </div>
+          </form>
+          <form th:case="3" th:object="${botForm}" method="post" th:action="@{/onboarding/bot}" class="grid gap-6">
+            <div>
+              <h2 class="text-xl font-semibold">Paso 3 · Creá tu primer bot</h2>
+              <p class="text-sm text-slate-400">Elegí símbolo, intervalo y un preset recomendado para arrancar.</p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="form-label" for="symbol">Símbolo</label>
+                <select class="form-input" id="symbol" th:field="*{symbol}">
+                  <option value="BTCUSDT">BTCUSDT</option>
+                  <option value="ETHUSDT">ETHUSDT</option>
+                  <option value="SOLUSDT">SOLUSDT</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="interval">Intervalo</label>
+                <select class="form-input" id="interval" th:field="*{interval}">
+                  <option value="1h">1 hora</option>
+                  <option value="4h">4 horas</option>
+                  <option value="1d">1 día</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" for="preset">Preset sugerido</label>
+              <select class="form-input" id="preset" th:field="*{preset}">
+                <option value="Momentum Shadow">Momentum Shadow</option>
+                <option value="Mean Reversion">Mean Reversion</option>
+                <option value="Volatility Breakout">Volatility Breakout</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-3">
+              <input class="h-4 w-4 rounded border-slate-600 bg-slate-900" id="shadow" th:field="*{shadowMode}" type="checkbox" />
+              <label class="text-sm text-slate-300" for="shadow">Crear en modo Shadow (recomendado)</label>
+            </div>
+            <div class="flex items-center justify-between">
+              <a class="btn-secondary" th:href="@{/onboarding?step=2}">Volver</a>
+              <button class="btn-primary" type="submit">Ir al panel</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

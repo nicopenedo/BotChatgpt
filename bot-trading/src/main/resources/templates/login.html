@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ingresar | QuantBot</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css"
+      integrity="sha384-z6W+MjWnaEWBtWYB8I4u0Xv+FbWXKocqFdrVZMGWjZB53xwMYw3EWHo6lQBAvMGN"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" th:href="@{/css/app.css}" />
+  </head>
+  <body class="flex min-h-screen items-center justify-center bg-slate-950 bg-[radial-gradient(circle_at_top,_#1e293b,_#020617)] px-4 text-slate-50">
+    <div class="w-full max-w-md rounded-3xl border border-slate-800/60 bg-slate-900/70 p-8 shadow-2xl backdrop-blur">
+      <div class="mb-6 flex items-center gap-3">
+        <img class="h-10 w-10" th:src="@{/img/logo.svg}" alt="QuantBot" />
+        <div>
+          <p class="text-xs uppercase tracking-widest text-emerald-400">QuantBot</p>
+          <h1 class="text-2xl font-semibold">Accedé a tu panel</h1>
+        </div>
+      </div>
+      <form th:action="@{/login}" method="post" class="space-y-5">
+        <div>
+          <label class="form-label" for="username">Email</label>
+          <input class="form-input" id="username" name="username" type="email" required autocomplete="email" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="form-label" for="password">Contraseña</label>
+            <a class="text-sm font-medium text-emerald-400 hover:text-emerald-300" href="#">¿Olvidaste tu contraseña?</a>
+          </div>
+          <input class="form-input" id="password" name="password" type="password" required autocomplete="current-password" />
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="h-4 w-4 rounded border-slate-600 bg-slate-900" id="remember-me" name="remember-me" type="checkbox" />
+          <label class="text-sm text-slate-300" for="remember-me">Recordarme en este dispositivo</label>
+        </div>
+        <div th:if="${param.error}" class="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+          Credenciales inválidas. Revisá tu email y contraseña.
+        </div>
+        <div th:if="${param.logout}" class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+          Sesión finalizada correctamente.
+        </div>
+        <div th:if="${param.ok}" class="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+          Cuenta creada. Iniciá sesión para continuar.
+        </div>
+        <button class="btn-primary w-full" type="submit">Ingresar</button>
+      </form>
+      <p class="mt-6 text-center text-sm text-slate-400">
+        ¿Aún no tenés cuenta?
+        <a class="font-medium text-emerald-400 hover:text-emerald-300" th:href="@{/signup}">Creá una demo gratis</a>
+      </p>
+    </div>
+  </body>
+</html>

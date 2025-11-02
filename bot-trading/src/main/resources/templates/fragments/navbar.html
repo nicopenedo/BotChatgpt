@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+  <th:block th:fragment="navbar(pageTitle, tenantSwitcher, notifications)">
+    <div class="flex h-16 items-center justify-between px-6">
+      <div class="flex items-center gap-4">
+        <button
+          class="inline-flex items-center justify-center rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+          type="button"
+          aria-label="Abrir navegación"
+          x-on:click="sidebarOpen = !sidebarOpen"
+        >
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5m-16.5 6h16.5m-16.5 6h16.5" />
+          </svg>
+        </button>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Panel</p>
+          <h1 class="text-xl font-semibold text-slate-900 dark:text-white" th:text="${pageTitle}">Dashboard</h1>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="relative">
+          <button
+            class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary"
+            type="button"
+            aria-haspopup="listbox"
+          >
+            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+            <span th:text="${tenantSwitcher?.currentTenant} ?: 'DEMO Capital'">DEMO Capital</span>
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.096l-4.23 3.83a.75.75 0 01-1.02 0l-4.23-3.83a.75.75 0 01.02-1.096z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-slate-300 dark:hover:bg-slate-800"
+            type="button"
+            aria-label="Cambiar modo"
+            x-on:click="toggleDarkMode()"
+          >
+            <svg x-show="!darkMode" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 10-1.414 1.414zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 7a1 1 0 001-1v-1a1 1 0 10-2 0v1a1 1 0 001 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707A1 1 0 104.343 5.757l.707.707zM4 11a1 1 0 100-2H3a1 1 0 000 2h1zm1.464 4.95a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707z" />
+            </svg>
+            <svg x-show="darkMode" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+            </svg>
+          </button>
+          <button
+            class="relative rounded-full p-2 text-slate-500 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-slate-300 dark:hover:bg-slate-800"
+            type="button"
+            aria-label="Notificaciones"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
+              <path d="M7 15a3 3 0 006 0H7z" />
+            </svg>
+            <span
+              class="absolute right-1 top-1 inline-flex h-2 w-2 rounded-full bg-emerald-500"
+              th:if="${notifications?.hasUnread}"
+            ></span>
+          </button>
+          <div class="relative">
+            <button
+              class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600 shadow-sm transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              type="button"
+              aria-haspopup="true"
+            >
+              <img class="h-8 w-8 rounded-full" th:src="${notifications?.avatar} ?: @{/img/logo.svg}" alt="Avatar" />
+              <span th:text="${notifications?.userName} ?: 'Demo Trader'">Demo Trader</span>
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.585l3.71-3.354a.75.75 0 111.02 1.096l-4.23 3.83a.75.75 0 01-1.02 0l-4.23-3.83a.75.75 0 01.02-1.096z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <div class="sr-only" id="user-menu-description">Menú de usuario</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </th:block>
+</html>
