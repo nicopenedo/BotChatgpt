@@ -3,7 +3,6 @@ package com.bottrading;
 import com.bottrading.config.props.AlertsProps;
 import com.bottrading.config.props.BanditProps;
 import com.bottrading.config.props.BinanceProps;
-import com.bottrading.config.props.PrometheusSecurityProps;
 import com.bottrading.config.props.SecurityProps;
 import com.bottrading.config.props.TradingProps;
 import org.springframework.boot.SpringApplication;
@@ -19,8 +18,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   TradingProps.class,
   BanditProps.class,
   AlertsProps.class,
-  SecurityProps.class,
-  PrometheusSecurityProps.class
+  SecurityProps.class
 })
 @EnableScheduling
 public class BotTradingApplication {

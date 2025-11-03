@@ -13,25 +13,26 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(
     properties = {
       "observability.prometheus.enabled=false",
-      "management.metrics.export.prometheus.enabled=false",
-      "observability.prometheus.token=test-token",
-      "management.endpoints.web.exposure.include=health,info,metrics"
+      "management.metrics.export.prometheus.enabled=true",
+      "prometheus.token=legacy-token",
+      "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
     })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
-class PrometheusEndpointDisabledTest {
+class PrometheusScrapeSecurityLegacyTokenTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Test
-  void prometheusEndpointUnavailableWhenDisabled() throws Exception {
+  void deniesWhenTokenMissingEvenIfDisabledFlagPresent() throws Exception {
     mockMvc.perform(get("/actuator/prometheus"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void healthEndpointRemainsAccessible() throws Exception {
-    mockMvc.perform(get("/actuator/health"))
+  void allowsWhenLegacyTokenProvided() throws Exception {
+    mockMvc
+        .perform(get("/actuator/prometheus").header("X-Prometheus-Token", "legacy-token"))
         .andExpect(status().isOk());
   }
 }

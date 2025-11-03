@@ -10,13 +10,18 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
+import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -27,21 +32,26 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
 
   private static final Logger log = LoggerFactory.getLogger(PrometheusScrapeSecurityFilter.class);
   private static final String PROMETHEUS_PATH = "/actuator/prometheus";
+  public static final String ACCESS_GRANTED_ATTRIBUTE =
+      PrometheusScrapeSecurityFilter.class.getName() + ".ACCESS_GRANTED";
   private static final String PROMETHEUS_TOKEN_HEADER = "X-Prometheus-Token";
   private static final String X_FORWARDED_FOR = "X-Forwarded-For";
   private static final String X_REAL_IP = "X-Real-IP";
 
   private final PrometheusSecurityProps properties;
   private final boolean prometheusExportEnabled;
+  private final boolean prometheusEndpointExposed;
   private final List<IpAddressMatcher> allowlistMatchers;
   private final List<IpAddressMatcher> trustedProxyMatchers;
 
   public PrometheusScrapeSecurityFilter(
       PrometheusSecurityProps properties,
       @Value("${management.metrics.export.prometheus.enabled:true}")
-          boolean prometheusExportEnabled) {
+          boolean prometheusExportEnabled,
+      WebEndpointProperties webEndpointProperties) {
     this.properties = properties;
     this.prometheusExportEnabled = prometheusExportEnabled;
+    this.prometheusEndpointExposed = isPrometheusEndpointExposed(webEndpointProperties);
     this.allowlistMatchers = compileCidrs(properties.allowlistCidrs(), "allowlist");
     this.trustedProxyMatchers = compileCidrs(properties.trustedProxiesCidrs(), "trusted proxy");
   }
@@ -49,9 +59,13 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
     String requestUri = request.getRequestURI();
-    return !prometheusExportEnabled
-        || !properties.enabled()
-        || !PROMETHEUS_PATH.equals(requestUri);
+    if (!PROMETHEUS_PATH.equals(requestUri)) {
+      return true;
+    }
+    if (!prometheusExportEnabled) {
+      return true;
+    }
+    return !prometheusEndpointExposed;
   }
 
   @Override
@@ -65,9 +79,18 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
 
     setNoStore(response);
 
-    if (!StringUtils.hasText(properties.token()) && allowlistMatchers.isEmpty()) {
+    boolean protectionEnabled = resolveEnabled();
+
+    if (!protectionEnabled && !properties.hasSecurityPolicies()) {
       log.warn(
-          "Prometheus expuesto sin token ni allowlist; bloqueando scrape hasta configurar seguridad");
+          "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
+      reject(response, HttpStatus.FORBIDDEN);
+      return;
+    }
+
+    if (!properties.hasSecurityPolicies()) {
+      log.warn(
+          "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
       reject(response, HttpStatus.FORBIDDEN);
       return;
     }
@@ -82,7 +105,19 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
       return;
     }
 
+    request.setAttribute(ACCESS_GRANTED_ATTRIBUTE, Boolean.TRUE);
     filterChain.doFilter(request, response);
+  }
+
+  private boolean resolveEnabled() {
+    Boolean configured = properties.enabled();
+    if (configured == null) {
+      return prometheusEndpointExposed;
+    }
+    if (!configured && properties.hasSecurityPolicies()) {
+      return true;
+    }
+    return configured;
   }
 
   private boolean validateToken(HttpServletRequest request) {
@@ -222,6 +257,32 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
 
   private void setNoStore(HttpServletResponse response) {
     response.setHeader("Cache-Control", "no-store");
+  }
+
+  private boolean isPrometheusEndpointExposed(WebEndpointProperties properties) {
+    WebEndpointProperties.Exposure exposure = properties.getExposure();
+    Set<String> include = normalize(exposure.getInclude());
+    Set<String> exclude = normalize(exposure.getExclude());
+
+    if (exclude.contains("*") || exclude.contains("prometheus")) {
+      return false;
+    }
+
+    if (include.isEmpty()) {
+      return false;
+    }
+
+    return include.contains("*") || include.contains("prometheus");
+  }
+
+  private Set<String> normalize(Collection<String> values) {
+    if (values == null || values.isEmpty()) {
+      return Set.of();
+    }
+    return values.stream()
+        .filter(StringUtils::hasText)
+        .map(value -> value.trim().toLowerCase(Locale.ROOT))
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   private record ForwardedHeaderResult(Optional<String> clientIp, boolean invalid) {

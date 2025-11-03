@@ -29,12 +29,14 @@ import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMap
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -86,7 +88,17 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                auth.requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/actuator/prometheus")
+                    .access(
+                        (authentication, context) ->
+                            new AuthorizationDecision(
+                                Boolean.TRUE.equals(
+                                    context
+                                        .getRequest()
+                                        .getAttribute(
+                                            PrometheusScrapeSecurityFilter
+                                                .ACCESS_GRANTED_ATTRIBUTE))))
                     .requestMatchers(HttpMethod.GET, "/api/tenant/status").hasAnyRole("OWNER", "ADMIN", "VIEWER")
                     .requestMatchers(HttpMethod.POST, "/api/tenant/api-keys").hasAnyRole("OWNER", "ADMIN")
                     .requestMatchers("/api/bots/**").hasAnyRole("OWNER", "ADMIN")
@@ -98,7 +110,7 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults());
-    http.addFilterBefore(prometheusScrapeSecurityFilter, TenantContextFilter.class);
+    http.addFilterBefore(prometheusScrapeSecurityFilter, AuthorizationFilter.class);
     http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
     http.addFilterAfter(sanctionsFilter, TenantContextFilter.class);
     http.addFilterAfter(mfaApiHeaderFilter, TenantContextFilter.class);
