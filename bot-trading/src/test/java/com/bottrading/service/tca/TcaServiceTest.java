@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bottrading.config.TradingProps;
 import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
+import com.bottrading.repository.TradeFillRepository;
+import com.bottrading.saas.security.TenantAccessGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,13 +18,18 @@ class TcaServiceTest {
 
   private TradingProps props;
   private TcaService service;
+  private TradeFillRepository tradeFillRepository;
+  private TenantAccessGuard tenantAccessGuard;
 
   @BeforeEach
   void setUp() {
     props = new TradingProps();
     props.getTca().setEnabled(true);
     props.getTca().setHistorySize(100);
-    service = new TcaService(props, new SimpleMeterRegistry());
+    tradeFillRepository = org.mockito.Mockito.mock(TradeFillRepository.class);
+    tenantAccessGuard = org.mockito.Mockito.mock(TenantAccessGuard.class);
+    org.mockito.Mockito.when(tenantAccessGuard.requireCurrentTenant()).thenReturn(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+    service = new TcaService(props, new SimpleMeterRegistry(), tradeFillRepository, tenantAccessGuard);
   }
 
   @Test

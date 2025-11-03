@@ -63,7 +63,8 @@ Las restricciones se almacenan en `tenant_limits` y `LimitsGuardService` bloquea
 ### Cuenta, privacidad y portabilidad
 
 - **Eliminar cuenta**: la vista `/ui/tenant/account/delete` requiere confirmación doble, contraseña y TOTP si el usuario tiene MFA. Se registra la solicitud, se marca el tenant con `deletion_requested_at`/`purge_after` y el job `TenantAccountCleanupJob` lo purga físicamente entre 24–72h (respetando las retenciones legales definidas en `saas.legal`).
-- **Exportar datos**: el botón `Exportar` genera un token firmado vía `TenantAccountService.createExportToken`. La descarga se sirve desde `/tenant/account/export?token=` con streaming de un ZIP (`trades.csv`, `fills.csv`, `executions.json`, `reports/*.pdf|html`). También se exponen rutas directas `/tenant/exports/trades.csv`, `/fills.csv`, `/executions.json`.
+- **Exportar datos**: el botón `Exportar` genera un token firmado vía `TenantAccountService.createExportToken`. La descarga se sirve desde `/tenant/account/export?token=` con streaming de un ZIP (`trades.csv`, `fills.csv`, `executions.json`, `reports/*.pdf|html`). También se exponen rutas directas `/tenant/{tenantId}/exports/trades.csv`, `/tenant/{tenantId}/exports/fills.csv`, `/tenant/{tenantId}/exports/executions.json`.
+- Todas las exportaciones se filtran por tenant directamente en base de datos; no hay filtrado en memoria.
 - **Auditoría**: todos los eventos (`solicitud`, `descarga`, `borrado`) quedan registrados en `audit_event` con claves `tenant.account.*`.
 
 Variables relevantes (`application.yml` / entorno):
@@ -121,7 +122,7 @@ saas:
 ### Reportes y exportes recurrentes
 
 - `TenantReportScheduler` genera reporte mensual HTML (Thymeleaf `report/report_monthly_template.html`) y lo convierte a PDF (FlyingSaucer/iText). Los archivos viven bajo `reports/tenant/<tenant>/<yyyy>/<mm>/`.
-- Endpoints auxiliares: `/tenant/exports/trades.csv`, `/fills.csv`, `/executions.json`.
+- Endpoints auxiliares: `/tenant/{tenantId}/exports/trades.csv`, `/tenant/{tenantId}/exports/fills.csv`, `/tenant/{tenantId}/exports/executions.json`.
 - `TenantDataExportService` reutiliza lógica para CSV/JSON y ZIP de portabilidad.
 
 ### QA y pruebas

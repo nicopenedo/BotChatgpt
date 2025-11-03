@@ -23,7 +23,10 @@ import com.bottrading.notify.TelegramNotifier;
 import com.bottrading.repository.ManagedOrderRepository;
 import com.bottrading.repository.PositionRepository;
 import com.bottrading.repository.TradeRepository;
+import com.bottrading.saas.security.TenantAccessGuard;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.service.report.PnlAttributionService;
+import com.bottrading.service.risk.drift.DriftWatchdog;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -35,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,12 +56,18 @@ class PositionManagerTests {
   private final AtomicLong idSeq = new AtomicLong(1);
   private final Map<Long, PositionEntity> positions = new HashMap<>();
   private final Map<Long, ManagedOrderEntity> orders = new HashMap<>();
+  private final DriftWatchdog driftWatchdog = mock(DriftWatchdog.class);
+  private final PnlAttributionService pnlAttributionService = mock(PnlAttributionService.class);
+  private final TenantAccessGuard tenantAccessGuard = mock(TenantAccessGuard.class);
+  private final UUID tenantId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
   @BeforeEach
   void setUp() {
     positions.clear();
     orders.clear();
     notifier.events.clear();
+
+    when(tenantAccessGuard.requireCurrentTenant()).thenReturn(tenantId);
 
     when(positionRepository.save(any(PositionEntity.class)))
         .thenAnswer(
@@ -219,7 +229,7 @@ class PositionManagerTests {
         ocoProperties,
         managerProperties,
         new SimpleMeterRegistry(),
-        Optional.of(clock));
+        Optional.of(clock), driftWatchdog, pnlAttributionService, tenantAccessGuard);
   }
 
   private static class RecordingNotifier extends TelegramNotifier {

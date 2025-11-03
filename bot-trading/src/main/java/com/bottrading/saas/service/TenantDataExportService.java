@@ -1,21 +1,25 @@
 package com.bottrading.saas.service;
 
 import com.bottrading.model.entity.OrderEntity;
-import com.bottrading.model.entity.PositionEntity;
 import com.bottrading.model.entity.TradeEntity;
 import com.bottrading.model.entity.TradeFillEntity;
 import com.bottrading.repository.OrderRepository;
 import com.bottrading.repository.TradeFillRepository;
 import com.bottrading.repository.TradeRepository;
-import com.bottrading.saas.security.TenantContext;
-import java.io.ByteArrayOutputStream;
+import com.bottrading.saas.security.TenantAccessGuard;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TenantDataExportService {
@@ -24,24 +28,28 @@ public class TenantDataExportService {
   private final TradeFillRepository tradeFillRepository;
   private final OrderRepository orderRepository;
   private final TenantReportService tenantReportService;
+  private final TenantAccessGuard tenantAccessGuard;
 
   public TenantDataExportService(
       TradeRepository tradeRepository,
       TradeFillRepository tradeFillRepository,
       OrderRepository orderRepository,
-      TenantReportService tenantReportService) {
+      TenantReportService tenantReportService,
+      TenantAccessGuard tenantAccessGuard) {
     this.tradeRepository = tradeRepository;
     this.tradeFillRepository = tradeFillRepository;
     this.orderRepository = orderRepository;
     this.tenantReportService = tenantReportService;
+    this.tenantAccessGuard = tenantAccessGuard;
   }
 
+  @Transactional(readOnly = true)
   public byte[] buildZip(UUID tenantId) {
-    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        ZipOutputStream zip = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
-      writeTrades(zip, tenantId);
-      writeFills(zip, tenantId);
-      writeExecutions(zip, tenantId);
+    try (var outputStream = new java.io.ByteArrayOutputStream();
+        var zip = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
+      writeTrades(zip, tenantId, null, null);
+      writeFills(zip, tenantId, null, null);
+      writeExecutions(zip, tenantId, null, null);
       writeReports(zip, tenantId);
       zip.finish();
       zip.flush();
@@ -51,107 +59,172 @@ public class TenantDataExportService {
     }
   }
 
-  public String tradesCsv(UUID tenantId) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("id,positionId,price,quantity,fee,side,executedAt\n");
-    List<TradeEntity> trades = tradeRepository.findAll();
-    for (TradeEntity trade : trades) {
-      PositionEntity position = trade.getPosition();
-      if (position != null && !matchesTenant(position.getPresetId(), tenantId)) {
-        continue;
-      }
-      builder.append(trade.getId())
-          .append(',')
-          .append(position != null ? position.getId() : "")
-          .append(',')
-          .append(n(trade.getPrice()))
-          .append(',')
-          .append(n(trade.getQuantity()))
-          .append(',')
-          .append(n(trade.getFee()))
-          .append(',')
-          .append(trade.getSide())
-          .append(',')
-          .append(trade.getExecutedAt())
-          .append('\n');
-    }
-    return builder.toString();
+  @Transactional(readOnly = true)
+  public void writeTradesCsv(Writer writer, Instant from, Instant to) {
+    doWriteTradesCsv(writer, tenantAccessGuard.requireCurrentTenant(), from, to);
   }
 
-  public String fillsCsv(UUID tenantId) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("id,orderId,price,qty,commission,commissionAsset,tradeId,createdAt\n");
-    List<TradeFillEntity> fills = tradeFillRepository.findAll();
-    for (TradeFillEntity fill : fills) {
-      if (fill.getTrade() != null && fill.getTrade().getPosition() != null) {
-        if (!matchesTenant(fill.getTrade().getPosition().getPresetId(), tenantId)) {
-          continue;
-        }
-      }
-      builder.append(fill.getId())
-          .append(',')
-          .append(fill.getOrderId())
-          .append(',')
-          .append(n(fill.getPrice()))
-          .append(',')
-          .append(n(fill.getQty()))
-          .append(',')
-          .append(n(fill.getCommission()))
-          .append(',')
-          .append(fill.getCommissionAsset())
-          .append(',')
-          .append(fill.getTrade() != null ? fill.getTrade().getId() : "")
-          .append(',')
-          .append(fill.getCreatedAt())
-          .append('\n');
-    }
-    return builder.toString();
+  @Transactional(readOnly = true)
+  public void writeTradesCsv(UUID tenantId, Writer writer, Instant from, Instant to) {
+    doWriteTradesCsv(writer, tenantId, from, to);
   }
 
-  public String executionsJson(UUID tenantId) {
-    StringBuilder builder = new StringBuilder();
-    builder.append("[\n");
-    List<OrderEntity> orders = orderRepository.findAll();
-    boolean first = true;
-    for (OrderEntity order : orders) {
-      if (order.getPosition() != null && !matchesTenant(order.getPosition().getPresetId(), tenantId)) {
-        continue;
+  private void doWriteTradesCsv(Writer writer, UUID tenantId, Instant from, Instant to) {
+    try {
+      writer.append("id,positionId,price,quantity,fee,side,executedAt\n");
+      try (Stream<TradeEntity> stream =
+          tradeRepository.streamByTenantAndRange(tenantId, from, to)) {
+        stream.forEach(trade -> {
+          try {
+            writer
+                .append(n(trade.getId()))
+                .append(',')
+                .append(trade.getPosition() != null ? n(trade.getPosition().getId()) : "")
+                .append(',')
+                .append(n(trade.getPrice()))
+                .append(',')
+                .append(n(trade.getQuantity()))
+                .append(',')
+                .append(n(trade.getFee()))
+                .append(',')
+                .append(trade.getSide() != null ? trade.getSide().name() : "")
+                .append(',')
+                .append(n(trade.getExecutedAt()))
+                .append('\n');
+          } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+          }
+        });
       }
-      if (!first) {
-        builder.append(",\n");
-      }
-      first = false;
-      builder
-          .append("  {")
-          .append("\"orderId\":\"").append(order.getOrderId()).append("\",")
-          .append("\"symbol\":\"").append(order.getSymbol()).append("\",")
-          .append("\"side\":\"").append(order.getSide()).append("\",")
-          .append("\"price\":\"").append(n(order.getPrice())).append("\",")
-          .append("\"quantity\":\"").append(n(order.getQuantity())).append("\",")
-          .append("\"status\":\"").append(order.getStatus()).append("\",")
-          .append("\"createdAt\":\"")
-          .append(order.getCreatedAt() != null ? order.getCreatedAt() : "")
-          .append("\"}");
+      writer.flush();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
-    builder.append("\n]\n");
-    return builder.toString();
   }
 
-  private void writeTrades(ZipOutputStream zip, UUID tenantId) throws IOException {
+  @Transactional(readOnly = true)
+  public void writeFillsCsv(Writer writer, Instant from, Instant to) {
+    doWriteFillsCsv(writer, tenantAccessGuard.requireCurrentTenant(), from, to);
+  }
+
+  @Transactional(readOnly = true)
+  public void writeFillsCsv(UUID tenantId, Writer writer, Instant from, Instant to) {
+    doWriteFillsCsv(writer, tenantId, from, to);
+  }
+
+  private void doWriteFillsCsv(Writer writer, UUID tenantId, Instant from, Instant to) {
+    try {
+      writer.append("id,orderId,refPrice,fillPrice,slippageBps,symbol,executedAt\n");
+      try (Stream<TradeFillEntity> stream =
+          tradeFillRepository.streamByTenantAndRange(tenantId, from, to)) {
+        stream.forEach(fill -> {
+          try {
+            writer
+                .append(n(fill.getId()))
+                .append(',')
+                .append(n(fill.getOrderId()))
+                .append(',')
+                .append(n(fill.getRefPrice()))
+                .append(',')
+                .append(n(fill.getFillPrice()))
+                .append(',')
+                .append(n(fill.getSlippageBps()))
+                .append(',')
+                .append(n(fill.getSymbol()))
+                .append(',')
+                .append(n(fill.getExecutedAt()))
+                .append('\n');
+          } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+          }
+        });
+      }
+      writer.flush();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public void writeExecutionsJson(Writer writer, Instant from, Instant to) {
+    doWriteExecutionsJson(writer, tenantAccessGuard.requireCurrentTenant(), from, to);
+  }
+
+  @Transactional(readOnly = true)
+  public void writeExecutionsJson(UUID tenantId, Writer writer, Instant from, Instant to) {
+    doWriteExecutionsJson(writer, tenantId, from, to);
+  }
+
+  private void doWriteExecutionsJson(Writer writer, UUID tenantId, Instant from, Instant to) {
+    try {
+      writer.append("[\n");
+      AtomicBoolean first = new AtomicBoolean(true);
+      try (Stream<OrderEntity> stream =
+          orderRepository.streamByTenantAndRange(tenantId, from, to)) {
+        stream.forEach(order -> {
+          try {
+            if (!first.getAndSet(false)) {
+              writer.append(",\n");
+            }
+            writer
+                .append("  {")
+                .append("\"orderId\":\"")
+                .append(escape(n(order.getOrderId())))
+                .append("\",\")
+                .append("\"symbol\":\"")
+                .append(escape(n(order.getSymbol())))
+                .append("\",\")
+                .append("\"side\":\"")
+                .append(escape(order.getSide() != null ? order.getSide().name() : ""))
+                .append("\",\")
+                .append("\"price\":\"")
+                .append(escape(n(order.getPrice())))
+                .append("\",\")
+                .append("\"quantity\":\"")
+                .append(escape(n(order.getQuantity())))
+                .append("\",\")
+                .append("\"status\":\"")
+                .append(escape(n(order.getStatus())))
+                .append("\",\")
+                .append("\"createdAt\":\"")
+                .append(escape(n(order.getTransactTime())))
+                .append("\"}");
+          } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+          }
+        });
+      }
+      writer.append("\n]\n");
+      writer.flush();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private void writeTrades(ZipOutputStream zip, UUID tenantId, Instant from, Instant to)
+      throws IOException {
     zip.putNextEntry(new ZipEntry("trades.csv"));
-    zip.write(tradesCsv(tenantId).getBytes(StandardCharsets.UTF_8));
+    var writer = new OutputStreamWriter(zip, StandardCharsets.UTF_8);
+    writeTradesCsv(tenantId, writer, from, to);
+    writer.flush();
     zip.closeEntry();
   }
 
-  private void writeFills(ZipOutputStream zip, UUID tenantId) throws IOException {
+  private void writeFills(ZipOutputStream zip, UUID tenantId, Instant from, Instant to)
+      throws IOException {
     zip.putNextEntry(new ZipEntry("fills.csv"));
-    zip.write(fillsCsv(tenantId).getBytes(StandardCharsets.UTF_8));
+    var writer = new OutputStreamWriter(zip, StandardCharsets.UTF_8);
+    writeFillsCsv(tenantId, writer, from, to);
+    writer.flush();
     zip.closeEntry();
   }
 
-  private void writeExecutions(ZipOutputStream zip, UUID tenantId) throws IOException {
+  private void writeExecutions(ZipOutputStream zip, UUID tenantId, Instant from, Instant to)
+      throws IOException {
     zip.putNextEntry(new ZipEntry("executions.json"));
-    zip.write(executionsJson(tenantId).getBytes(StandardCharsets.UTF_8));
+    var writer = new OutputStreamWriter(zip, StandardCharsets.UTF_8);
+    writeExecutionsJson(tenantId, writer, from, to);
+    writer.flush();
     zip.closeEntry();
   }
 
@@ -182,11 +255,7 @@ public class TenantDataExportService {
     return value == null ? "" : value.toString();
   }
 
-  private boolean matchesTenant(UUID presetId, UUID tenantId) {
-    if (presetId == null || tenantId == null) {
-      return true;
-    }
-    UUID currentTenant = TenantContext.getTenantId();
-    return currentTenant == null || currentTenant.equals(tenantId);
+  private String escape(String value) {
+    return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 }

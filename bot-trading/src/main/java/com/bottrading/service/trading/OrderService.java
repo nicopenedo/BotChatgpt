@@ -11,6 +11,7 @@ import com.bottrading.service.anomaly.AnomalyDetector;
 import com.bottrading.service.risk.RiskGuard;
 import com.bottrading.service.risk.TradingState;
 import com.bottrading.util.IdGenerator;
+import com.bottrading.saas.security.TenantAccessGuard;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ public class OrderService {
   private final Counter ordersSent;
   private final Counter ordersFilled;
   private final AnomalyDetector anomalyDetector;
+  private final TenantAccessGuard tenantAccessGuard;
 
   public OrderService(
       BinanceClient binanceClient,
@@ -44,7 +46,7 @@ public class OrderService {
       RiskGuard riskGuard,
       OrderRepository orderRepository,
       MeterRegistry meterRegistry,
-      AnomalyDetector anomalyDetector) {
+      AnomalyDetector anomalyDetector, TenantAccessGuard tenantAccessGuard) {
     this.binanceClient = binanceClient;
     this.tradingProperties = tradingProperties;
     this.tradingState = tradingState;
@@ -53,6 +55,7 @@ public class OrderService {
     this.ordersSent = meterRegistry.counter("orders.sent");
     this.ordersFilled = meterRegistry.counter("orders.filled");
     this.anomalyDetector = anomalyDetector;
+    this.tenantAccessGuard = tenantAccessGuard;
   }
 
   @Transactional
@@ -148,6 +151,7 @@ public class OrderService {
     entity.setQuoteQty(response.cummulativeQuoteQty());
     entity.setStatus(response.status());
     entity.setTransactTime(response.transactTime());
+    entity.setTenantId(tenantAccessGuard.requireCurrentTenant());
     orderRepository.save(entity);
   }
 }
