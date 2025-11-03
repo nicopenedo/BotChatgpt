@@ -1,0 +1,35 @@
+server:
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        secure: true
+        same-site: LAX
+        http-only: true
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+
+trading:
+  mode: ${TRADING_MODE:SHADOW}
+  risk:
+    global-pause: ${TRADING_RISK_GLOBAL_PAUSE:${GLOBAL_PAUSE:true}}
+    max-daily-drawdown-pct: ${TRADING_RISK_MAX_DAILY_DRAWDOWN_PCT:${MAX_DAILY_DRAWDOWN_PCT:5}}
+    max-concurrent-positions: ${TRADING_RISK_MAX_CONCURRENT_POSITIONS:${MAX_CONCURRENT_POSITIONS:3}}
+    max-daily-trades: ${TRADING_RISK_MAX_DAILY_TRADES:${MAX_DAILY_TRADES:20}}
+    canary-pct: ${TRADING_RISK_CANARY_PCT:${CANARY_PCT:0.25}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+
+logging:
+  level:
+    root: INFO

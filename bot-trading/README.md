@@ -3,6 +3,14 @@
 ## Introducción
 Este proyecto provee un bot de scalping para Binance Spot construido con Spring Boot 3 y Java 21. El objetivo es entregar una base robusta, segura y lista para producción que opere varios símbolos en paralelo (por defecto `BTCUSDT`, `ETHUSDT`, `BNBUSDT`) y pueda adaptarse dinámicamente a distintos regímenes de mercado.
 
+## Setup local en 3 pasos
+
+1. Copiá el archivo de ejemplo y creá tu entorno: `cp .env.example .env`.
+2. Levantá las dependencias necesarias (Postgres + Redis) con Docker: `docker compose up -d`.
+3. Ejecutá la aplicación en modo local/testnet: `mvn spring-boot:run -Dspring-boot.run.profiles=local`.
+
+El archivo `.env.example` provee valores seguros que dejan el bot en modo **SHADOW** con `trading.risk.global-pause=true` y las claves de Binance apuntando al **TESTNET** (`https://testnet.binance.vision`). Para operar en vivo, cambiá `TRADING_MODE` a `LIVE`, desactivá el `GLOBAL_PAUSE` y configurá credenciales reales mediante variables de entorno (sin editar el código fuente).
+
 ## QA Seguridad UI
 - [ ] Formularios en `/tenant/**` rechazan POST sin token CSRF y aceptan con token válido.
 - [ ] Sitios externos no pueden enviar POST válidos a `/tenant/**` (403 por CSRF).
