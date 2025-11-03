@@ -5,6 +5,7 @@ import com.bottrading.saas.model.entity.TenantEntity;
 import com.bottrading.saas.repository.TenantRepository;
 import com.bottrading.saas.service.AuditService;
 import com.bottrading.saas.service.GeoLocationService;
+import com.bottrading.util.JsonUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,7 +73,7 @@ public class SanctionsFilter extends OncePerRequestFilter {
       if (request.getRequestURI().startsWith("/api/")) {
         response.setStatus(451);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"error\":\"geo_blocked\"}");
+        response.getWriter().write(JsonUtils.toJson(java.util.Map.of("error", "geo_blocked")));
       } else {
         response.sendRedirect("/blocked");
       }

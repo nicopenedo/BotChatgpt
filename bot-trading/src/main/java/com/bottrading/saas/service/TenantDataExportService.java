@@ -7,6 +7,7 @@ import com.bottrading.repository.OrderRepository;
 import com.bottrading.repository.TradeFillRepository;
 import com.bottrading.repository.TradeRepository;
 import com.bottrading.saas.security.TenantAccessGuard;
+import com.bottrading.util.JsonUtils;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
@@ -166,29 +167,7 @@ public class TenantDataExportService {
             if (!first.getAndSet(false)) {
               writer.append(",\n");
             }
-            writer
-                .append("  {")
-                .append("\"orderId\":\"")
-                .append(escape(n(order.getOrderId())))
-                .append("\",\")
-                .append("\"symbol\":\"")
-                .append(escape(n(order.getSymbol())))
-                .append("\",\")
-                .append("\"side\":\"")
-                .append(escape(order.getSide() != null ? order.getSide().name() : ""))
-                .append("\",\")
-                .append("\"price\":\"")
-                .append(escape(n(order.getPrice())))
-                .append("\",\")
-                .append("\"quantity\":\"")
-                .append(escape(n(order.getQuantity())))
-                .append("\",\")
-                .append("\"status\":\"")
-                .append(escape(n(order.getStatus())))
-                .append("\",\")
-                .append("\"createdAt\":\"")
-                .append(escape(n(order.getTransactTime())))
-                .append("\"}");
+            writer.append("  ").append(JsonUtils.orderToJson(order));
           } catch (IOException ex) {
             throw new UncheckedIOException(ex);
           }
@@ -253,9 +232,5 @@ public class TenantDataExportService {
 
   private String n(Object value) {
     return value == null ? "" : value.toString();
-  }
-
-  private String escape(String value) {
-    return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 }
