@@ -12,26 +12,22 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
     properties = {
-      "observability.prometheus.enabled=false",
-      "management.metrics.export.prometheus.enabled=false",
-      "observability.prometheus.token=test-token",
-      "management.endpoints.web.exposure.include=health,info,metrics"
+      "observability.prometheus.enabled=true",
+      "management.metrics.export.prometheus.enabled=true",
+      "observability.prometheus.allowlist-cidrs=",
+      "observability.prometheus.trusted-proxies-cidrs=",
+      "observability.prometheus.token=",
+      "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
     })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
-class PrometheusEndpointDisabledTest {
+class PrometheusScrapeSecurityMisconfigurationTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Test
-  void prometheusEndpointUnavailableWhenDisabled() throws Exception {
+  void deniesWhenNoTokenNorAllowlistConfigured() throws Exception {
     mockMvc.perform(get("/actuator/prometheus"))
-        .andExpect(status().isNotFound());
-  }
-
-  @Test
-  void healthEndpointRemainsAccessible() throws Exception {
-    mockMvc.perform(get("/actuator/health"))
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
   }
 }

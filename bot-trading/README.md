@@ -475,9 +475,11 @@ Para iniciar sesión demo usar `viewer/viewerPass`. El front consume los endpoin
 - Bucket4j limita `/api/trade/**` a `maxOrdersPerMinute` configurado en `TradingProps`.
 
 ## Observabilidad
-- En producción, `/actuator/prometheus` queda expuesto si `PROMETHEUS_ENABLED=true` y `MANAGEMENT_ENDPOINTS_INCLUDE` incluye el endpoint (por defecto `health,info,metrics,prometheus`).
-- Para endurecer el scrape configura una allowlist (`PROMETHEUS_ALLOWLIST=10.0.0.0/8,192.168.0.0/16`) o un token (`PROMETHEUS_TOKEN=super-secreto`) que Prometheus debe enviar en `X-Prometheus-Token`.
-- Para deshabilitar la exposición establece `PROMETHEUS_ENABLED=false` y actualiza `MANAGEMENT_ENDPOINTS_INCLUDE=health,info,metrics`.
+- En producción, `/actuator/prometheus` queda expuesto si `observability.prometheus.enabled=true` (`OBSERVABILITY_PROMETHEUS_ENABLED`) y `MANAGEMENT_ENDPOINTS_INCLUDE` incluye el endpoint (por defecto `health,info,metrics,prometheus`).
+- Endurecé el scrape configurando `OBSERVABILITY_PROMETHEUS_ALLOWLIST_CIDRS` (CIDRs del cliente final) y, si tenés reverse proxies/LB/ingress, la lista `OBSERVABILITY_PROMETHEUS_TRUSTED_PROXIES_CIDRS`.
+- El filtro solo confía en `X-Forwarded-For`/`X-Real-IP` cuando la conexión llega desde un proxy confiable; sin proxies declarados usa `request.getRemoteAddr()` directamente.
+- Recomendado exigir además un token (`OBSERVABILITY_PROMETHEUS_TOKEN`) que Prometheus debe enviar como `X-Prometheus-Token`.
+- Fail-safe: si no hay token ni allowlist el scrape se bloquea (403). Para deshabilitar completamente fijá `OBSERVABILITY_PROMETHEUS_ENABLED=false` y actualizá `MANAGEMENT_ENDPOINTS_INCLUDE=health,info,metrics`.
 - Salud en `/actuator/health` (sin autenticación).
 - Contadores: `scheduler.candle.decisions{result=BUY|SELL|FLAT|SKIPPED,...}`, `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
 - Temporizador: `scheduler.candle.duration.ms`.

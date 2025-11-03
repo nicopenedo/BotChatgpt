@@ -24,6 +24,13 @@ trading:
     max-daily-trades: ${TRADING_RISK_MAX_DAILY_TRADES:${MAX_DAILY_TRADES:20}}
     canary-pct: ${TRADING_RISK_CANARY_PCT:${CANARY_PCT:0.25}}
 
+observability:
+  prometheus:
+    enabled: ${OBSERVABILITY_PROMETHEUS_ENABLED:true}
+    allowlist-cidrs: ${OBSERVABILITY_PROMETHEUS_ALLOWLIST_CIDRS:127.0.0.1/32}
+    trusted-proxies-cidrs: ${OBSERVABILITY_PROMETHEUS_TRUSTED_PROXIES_CIDRS:}
+    token: ${OBSERVABILITY_PROMETHEUS_TOKEN:${PROMETHEUS_TOKEN:}}
+
 management:
   metrics:
     export:
