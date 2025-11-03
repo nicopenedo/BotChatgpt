@@ -1,0 +1,63 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/botdb}
+    username: ${SPRING_DATASOURCE_USERNAME:botuser}
+    password: ${SPRING_DATASOURCE_PASSWORD:botpass}
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.time_zone: UTC
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: ${SERVER_SERVLET_SESSION_COOKIE_SECURE:false}
+        same-site: ${SERVER_SERVLET_SESSION_COOKIE_SAMESITE:LAX}
+        http-only: true
+
+security:
+  jwt:
+    secret: ${SECURITY_JWT_SECRET:${JWT_SECRET:change_me_dev_only}}
+    totp-issuer: ${SECURITY_JWT_TOTP_ISSUER:${TOTP_ISSUER:BotTradingSaaS}}
+
+binance:
+  api-key: ${BINANCE_API_KEY:FAKE_TESTNET_KEY}
+  api-secret: ${BINANCE_API_SECRET:FAKE_TESTNET_SECRET}
+  base-url: ${BINANCE_BASE_URL:https://testnet.binance.vision}
+
+trading:
+  mode: ${TRADING_MODE:SHADOW}
+  risk:
+    global-pause: ${TRADING_RISK_GLOBAL_PAUSE:${GLOBAL_PAUSE:true}}
+    max-daily-drawdown-pct: ${TRADING_RISK_MAX_DAILY_DRAWDOWN_PCT:${MAX_DAILY_DRAWDOWN_PCT:3}}
+    max-concurrent-positions: ${TRADING_RISK_MAX_CONCURRENT_POSITIONS:${MAX_CONCURRENT_POSITIONS:2}}
+    max-daily-trades: ${TRADING_RISK_MAX_DAILY_TRADES:${MAX_DAILY_TRADES:10}}
+    canary-pct: ${TRADING_RISK_CANARY_PCT:${CANARY_PCT:0.10}}
+
+bandit:
+  strategy: ${BANDIT_STRATEGY:THOMPSON}
+  exploration-pct: ${BANDIT_EXPLORATION_PCT:0.10}
+  context-features: ${BANDIT_CONTEXT_FEATURES:regime,volatility,hour,spread,slippage}
+
+alerts:
+  email-enabled: ${ALERTS_EMAIL_ENABLED:true}
+  telegram-enabled: ${ALERTS_TELEGRAM_ENABLED:false}
+  telegram-bot-token: ${ALERTS_TELEGRAM_BOT_TOKEN:${TELEGRAM_BOT_TOKEN:}}
+  telegram-chat-id: ${ALERTS_TELEGRAM_CHAT_ID:${TELEGRAM_CHAT_ID:}}
+
+tenant:
+  seed-admin-email: ${TENANT_SEED_ADMIN_EMAIL:admin@example.com}
+  seed-admin-pass: ${TENANT_SEED_ADMIN_PASS:changeme}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
