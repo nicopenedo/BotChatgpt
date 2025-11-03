@@ -1,5 +1,6 @@
 package com.bottrading.config;
 
+import com.bottrading.config.security.PrometheusScrapeSecurityFilter;
 import com.bottrading.saas.security.MfaApiHeaderFilter;
 import com.bottrading.saas.security.MfaUiSessionFilter;
 import com.bottrading.saas.security.SanctionsFilter;
@@ -46,6 +47,7 @@ public class SecurityConfig {
   private final MfaUiSessionFilter mfaUiSessionFilter;
   private final SanctionsFilter sanctionsFilter;
   private final GrantedAuthoritiesMapper staffAuthoritiesMapper;
+  private final PrometheusScrapeSecurityFilter prometheusScrapeSecurityFilter;
 
   public SecurityConfig(
       TenantUserDetailsService userDetailsService,
@@ -53,13 +55,15 @@ public class SecurityConfig {
       MfaApiHeaderFilter mfaApiHeaderFilter,
       MfaUiSessionFilter mfaUiSessionFilter,
       SanctionsFilter sanctionsFilter,
-      GrantedAuthoritiesMapper staffAuthoritiesMapper) {
+      GrantedAuthoritiesMapper staffAuthoritiesMapper,
+      PrometheusScrapeSecurityFilter prometheusScrapeSecurityFilter) {
     this.userDetailsService = userDetailsService;
     this.tenantContextFilter = tenantContextFilter;
     this.mfaApiHeaderFilter = mfaApiHeaderFilter;
     this.mfaUiSessionFilter = mfaUiSessionFilter;
     this.sanctionsFilter = sanctionsFilter;
     this.staffAuthoritiesMapper = staffAuthoritiesMapper;
+    this.prometheusScrapeSecurityFilter = prometheusScrapeSecurityFilter;
   }
 
   @Bean
@@ -94,6 +98,7 @@ public class SecurityConfig {
                     .anyRequest()
                     .authenticated())
         .httpBasic(Customizer.withDefaults());
+    http.addFilterBefore(prometheusScrapeSecurityFilter, TenantContextFilter.class);
     http.addFilterBefore(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
     http.addFilterAfter(sanctionsFilter, TenantContextFilter.class);
     http.addFilterAfter(mfaApiHeaderFilter, TenantContextFilter.class);
