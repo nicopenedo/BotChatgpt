@@ -1,16 +1,13 @@
 package com.bottrading.config.props;
 
-import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
-@ConfigurationProperties(prefix = "observability.prometheus")
 @Validated
 public record PrometheusSecurityProps(
-    @NotNull boolean enabled,
+    Boolean enabled,
     List<String> allowlistCidrs,
     List<String> trustedProxiesCidrs,
     String token) {
@@ -23,7 +20,11 @@ public record PrometheusSecurityProps(
     token = token == null ? "" : token.trim();
   }
 
-  private static List<String> sanitizeList(List<String> cidrs) {
+  public boolean hasSecurityPolicies() {
+    return StringUtils.hasText(token) || !allowlistCidrs.isEmpty();
+  }
+
+  static List<String> sanitizeList(List<String> cidrs) {
     if (cidrs == null || cidrs.isEmpty()) {
       return EMPTY;
     }

@@ -475,11 +475,12 @@ Para iniciar sesión demo usar `viewer/viewerPass`. El front consume los endpoin
 - Bucket4j limita `/api/trade/**` a `maxOrdersPerMinute` configurado en `TradingProps`.
 
 ## Observabilidad
-- En producción, `/actuator/prometheus` queda expuesto si `observability.prometheus.enabled=true` (`OBSERVABILITY_PROMETHEUS_ENABLED`) y `MANAGEMENT_ENDPOINTS_INCLUDE` incluye el endpoint (por defecto `health,info,metrics,prometheus`).
-- Endurecé el scrape configurando `OBSERVABILITY_PROMETHEUS_ALLOWLIST_CIDRS` (CIDRs del cliente final) y, si tenés reverse proxies/LB/ingress, la lista `OBSERVABILITY_PROMETHEUS_TRUSTED_PROXIES_CIDRS`.
+- En producción, `/actuator/prometheus` queda expuesto cuando `MANAGEMENT_ENDPOINTS_INCLUDE` incluye el endpoint (default `health,info,metrics,prometheus`). La protección se activa por omisión (`PROMETHEUS_ENABLED=true`) y niega accesos anónimos salvo que definas políticas explícitas.
+- Endurecé el scrape configurando `PROMETHEUS_ALLOWLIST_CIDRS` (CIDRs del cliente final) y, si tenés reverse proxies/LB/ingress, la lista `PROMETHEUS_TRUSTED_PROXIES_CIDRS`.
 - El filtro solo confía en `X-Forwarded-For`/`X-Real-IP` cuando la conexión llega desde un proxy confiable; sin proxies declarados usa `request.getRemoteAddr()` directamente.
-- Recomendado exigir además un token (`OBSERVABILITY_PROMETHEUS_TOKEN`) que Prometheus debe enviar como `X-Prometheus-Token`.
-- Fail-safe: si no hay token ni allowlist el scrape se bloquea (403). Para deshabilitar completamente fijá `OBSERVABILITY_PROMETHEUS_ENABLED=false` y actualizá `MANAGEMENT_ENDPOINTS_INCLUDE=health,info,metrics`.
+- Recomendado exigir además un token (`PROMETHEUS_TOKEN`) que Prometheus debe enviar como `X-Prometheus-Token`.
+- Fail-safe: si no hay token ni allowlist el scrape se bloquea (403) y se loguea un WARN indicando que configures `observability.prometheus.token` o `allowlist-cidrs`. Para deshabilitar completamente fijá `PROMETHEUS_ENABLED=false` y actualizá `MANAGEMENT_ENDPOINTS_INCLUDE=health,info,metrics`.
+- Compatibilidad: las propiedades legacy `prometheus.allowlist`, `prometheus.token` y `prometheus.trusted-proxies` se siguen respetando automáticamente, aunque se recomienda migrar a `observability.prometheus.*`.
 - Salud en `/actuator/health` (sin autenticación).
 - Contadores: `scheduler.candle.decisions{result=BUY|SELL|FLAT|SKIPPED,...}`, `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
 - Temporizador: `scheduler.candle.duration.ms`.

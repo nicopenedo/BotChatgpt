@@ -9,24 +9,36 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(
     properties = {
       "management.metrics.export.prometheus.enabled=true",
-      "observability.prometheus.allowlist-cidrs=",
-      "observability.prometheus.trusted-proxies-cidrs=",
-      "observability.prometheus.token=",
+      "prometheus.allowlist=127.0.0.1/32",
       "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
     })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
-class PrometheusScrapeSecurityMisconfigurationTest {
+class PrometheusScrapeSecurityLegacyAllowlistTest {
 
   @Autowired private MockMvc mockMvc;
 
   @Test
-  void deniesWhenNoTokenNorAllowlistConfigured() throws Exception {
-    mockMvc.perform(get("/actuator/prometheus"))
+  void allowsScrapeFromLegacyAllowlist() throws Exception {
+    mockMvc.perform(get("/actuator/prometheus").with(remoteAddr("127.0.0.1")))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void blocksScrapeOutsideLegacyAllowlist() throws Exception {
+    mockMvc.perform(get("/actuator/prometheus").with(remoteAddr("1.2.3.4")))
         .andExpect(status().isForbidden());
+  }
+
+  private static RequestPostProcessor remoteAddr(String ip) {
+    return request -> {
+      request.setRemoteAddr(ip);
+      return request;
+    };
   }
 }

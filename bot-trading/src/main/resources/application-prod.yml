@@ -26,10 +26,10 @@ trading:
 
 observability:
   prometheus:
-    enabled: ${OBSERVABILITY_PROMETHEUS_ENABLED:true}
-    allowlist-cidrs: ${OBSERVABILITY_PROMETHEUS_ALLOWLIST_CIDRS:127.0.0.1/32}
-    trusted-proxies-cidrs: ${OBSERVABILITY_PROMETHEUS_TRUSTED_PROXIES_CIDRS:}
-    token: ${OBSERVABILITY_PROMETHEUS_TOKEN:${PROMETHEUS_TOKEN:}}
+    enabled: ${PROMETHEUS_ENABLED:true}
+    allowlist-cidrs: ${PROMETHEUS_ALLOWLIST_CIDRS:}
+    trusted-proxies-cidrs: ${PROMETHEUS_TRUSTED_PROXIES_CIDRS:}
+    token: ${PROMETHEUS_TOKEN:}
 
 management:
   metrics:
