@@ -475,8 +475,10 @@ Para iniciar sesión demo usar `viewer/viewerPass`. El front consume los endpoin
 - Bucket4j limita `/api/trade/**` a `maxOrdersPerMinute` configurado en `TradingProps`.
 
 ## Observabilidad
-- Métricas en `/actuator/prometheus`.
-- Salud en `/actuator/health`.
+- En producción, `/actuator/prometheus` queda expuesto si `PROMETHEUS_ENABLED=true` y `MANAGEMENT_ENDPOINTS_INCLUDE` incluye el endpoint (por defecto `health,info,metrics,prometheus`).
+- Para endurecer el scrape configura una allowlist (`PROMETHEUS_ALLOWLIST=10.0.0.0/8,192.168.0.0/16`) o un token (`PROMETHEUS_TOKEN=super-secreto`) que Prometheus debe enviar en `X-Prometheus-Token`.
+- Para deshabilitar la exposición establece `PROMETHEUS_ENABLED=false` y actualiza `MANAGEMENT_ENDPOINTS_INCLUDE=health,info,metrics`.
+- Salud en `/actuator/health` (sin autenticación).
 - Contadores: `scheduler.candle.decisions{result=BUY|SELL|FLAT|SKIPPED,...}`, `orders.sent`, `orders.filled`, `strategy.signals`, `risk.stopouts`.
 - Temporizador: `scheduler.candle.duration.ms`.
 - Contadores adicionales: `router.selections{preset}`, `allocator.opens.allowed/blocked`, `drift.downgrades`, `health.pauses`, `tca.samples{symbol,type}`.

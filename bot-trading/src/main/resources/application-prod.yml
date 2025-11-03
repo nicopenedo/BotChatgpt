@@ -25,10 +25,14 @@ trading:
     canary-pct: ${TRADING_RISK_CANARY_PCT:${CANARY_PCT:0.25}}
 
 management:
+  metrics:
+    export:
+      prometheus:
+        enabled: ${PROMETHEUS_ENABLED:true}
   endpoints:
     web:
       exposure:
-        include: "health,info,metrics"
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics,prometheus}
 
 logging:
   level:
