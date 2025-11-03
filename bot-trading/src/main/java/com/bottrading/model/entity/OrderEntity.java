@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "orders")
@@ -41,6 +42,9 @@ public class OrderEntity {
 
   @Column(name = "quote_qty")
   private BigDecimal quoteQty;
+
+  @Column(name = "tenant_id", nullable = false)
+  private UUID tenantId;
 
   private String status;
   private Instant transactTime;
@@ -123,6 +127,14 @@ public class OrderEntity {
 
   public void setQuoteQty(BigDecimal quoteQty) {
     this.quoteQty = quoteQty;
+  }
+
+  public UUID getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(UUID tenantId) {
+    this.tenantId = tenantId;
   }
 
   public String getStatus() {

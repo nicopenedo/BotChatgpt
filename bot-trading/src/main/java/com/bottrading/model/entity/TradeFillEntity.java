@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "trade_fill")
@@ -46,6 +47,9 @@ public class TradeFillEntity {
 
   @Column(name = "queue_time_ms")
   private Long queueTimeMs;
+
+  @Column(name = "tenant_id", nullable = false)
+  private UUID tenantId;
 
   @Column(name = "executed_at")
   private Instant executedAt;
@@ -128,6 +132,14 @@ public class TradeFillEntity {
 
   public void setQueueTimeMs(Long queueTimeMs) {
     this.queueTimeMs = queueTimeMs;
+  }
+
+  public UUID getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(UUID tenantId) {
+    this.tenantId = tenantId;
   }
 
   public Instant getExecutedAt() {

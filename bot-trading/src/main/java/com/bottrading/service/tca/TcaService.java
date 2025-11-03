@@ -5,6 +5,7 @@ import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
 import com.bottrading.model.entity.TradeFillEntity;
 import com.bottrading.repository.TradeFillRepository;
+import com.bottrading.saas.security.TenantAccessGuard;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -31,15 +32,17 @@ public class TcaService {
   private final TradingProps tradingProps;
   private final MeterRegistry meterRegistry;
   private final TradeFillRepository tradeFillRepository;
+  private final TenantAccessGuard tenantAccessGuard;
   private final Deque<TcaSample> samples;
   private final ConcurrentMap<String, PendingOrder> pending = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, AtomicReference<Double>> averageGauge = new ConcurrentHashMap<>();
 
   public TcaService(
-      TradingProps tradingProps, MeterRegistry meterRegistry, TradeFillRepository tradeFillRepository) {
+      TradingProps tradingProps, MeterRegistry meterRegistry, TradeFillRepository tradeFillRepository, TenantAccessGuard tenantAccessGuard) {
     this.tradingProps = tradingProps;
     this.meterRegistry = meterRegistry;
     this.tradeFillRepository = tradeFillRepository;
+    this.tenantAccessGuard = tenantAccessGuard;
     this.samples = new ArrayDeque<>(tradingProps.getTca().getHistorySize());
   }
 
@@ -256,6 +259,7 @@ public class TcaService {
       entity.setSlippageBps(sample.slippageBps());
       entity.setQueueTimeMs(sample.queueTimeMs());
       entity.setExecutedAt(sample.timestamp());
+      entity.setTenantId(tenantAccessGuard.requireCurrentTenant());
       tradeFillRepository.save(entity);
     } catch (Exception ex) {
       // ignore persistence issues but keep in-memory samples

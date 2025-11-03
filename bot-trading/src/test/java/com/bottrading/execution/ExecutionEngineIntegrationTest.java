@@ -11,6 +11,7 @@ import com.bottrading.model.enums.OrderSide;
 import com.bottrading.model.enums.OrderType;
 import com.bottrading.saas.security.TenantContext;
 import com.bottrading.service.binance.BinanceClient;
+import com.bottrading.saas.security.TenantAccessGuard;
 import com.bottrading.service.tca.TcaService;
 import com.bottrading.service.trading.OrderService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -45,6 +46,7 @@ class ExecutionEngineIntegrationTest {
   private TradingProps tradingProps;
   private SlippageMetrics slippageMetrics;
   private PovMetrics povMetrics;
+  private TenantAccessGuard tenantAccessGuard;
 
   @BeforeEach
   void setup() {
@@ -54,7 +56,9 @@ class ExecutionEngineIntegrationTest {
     binanceClient = mock(BinanceClient.class);
     meterRegistry = new SimpleMeterRegistry();
     tradingProps = new TradingProps();
-    tcaService = new TcaService(tradingProps, meterRegistry, mock(com.bottrading.repository.TradeFillRepository.class));
+    tenantAccessGuard = mock(TenantAccessGuard.class);
+    when(tenantAccessGuard.requireCurrentTenant()).thenReturn(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+    tcaService = new TcaService(tradingProps, meterRegistry, mock(com.bottrading.repository.TradeFillRepository.class), tenantAccessGuard);
     clock = Clock.fixed(Instant.parse("2024-01-01T00:00:00Z"), ZoneOffset.UTC);
     slippageMetrics = new SlippageMetrics(meterRegistry, properties, clock);
     povMetrics = new PovMetrics(meterRegistry, properties, clock);

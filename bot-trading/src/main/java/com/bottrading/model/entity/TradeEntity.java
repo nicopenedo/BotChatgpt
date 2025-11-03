@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "trades")
@@ -34,6 +35,9 @@ public class TradeEntity {
   private BigDecimal quantity;
 
   private BigDecimal fee;
+
+  @Column(name = "tenant_id", nullable = false)
+  private UUID tenantId;
 
   @Enumerated(EnumType.STRING)
   private OrderSide side;
@@ -87,6 +91,14 @@ public class TradeEntity {
 
   public void setFee(BigDecimal fee) {
     this.fee = fee;
+  }
+
+  public UUID getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(UUID tenantId) {
+    this.tenantId = tenantId;
   }
 
   public OrderSide getSide() {

@@ -15,6 +15,7 @@ import com.bottrading.repository.PositionRepository;
 import com.bottrading.repository.TradeRepository;
 import com.bottrading.service.binance.BinanceClient;
 import com.bottrading.service.report.PnlAttributionService;
+import com.bottrading.saas.security.TenantAccessGuard;
 import com.bottrading.service.risk.drift.DriftWatchdog;
 import com.bottrading.util.IdGenerator;
 import io.micrometer.core.instrument.Counter;
@@ -59,6 +60,7 @@ public class PositionManager {
   private final Counter ocoCorrections;
   private final DriftWatchdog driftWatchdog;
   private final PnlAttributionService pnlAttributionService;
+  private final TenantAccessGuard tenantAccessGuard;
   private final ConcurrentMap<Long, ReentrantLock> positionLocks = new ConcurrentHashMap<>();
 
   public PositionManager(
@@ -72,7 +74,8 @@ public class PositionManager {
       MeterRegistry meterRegistry,
       Optional<Clock> clock,
       DriftWatchdog driftWatchdog,
-      PnlAttributionService pnlAttributionService) {
+      PnlAttributionService pnlAttributionService,
+      TenantAccessGuard tenantAccessGuard) {
     this.positionRepository = positionRepository;
     this.managedOrderRepository = managedOrderRepository;
     this.tradeRepository = tradeRepository;
@@ -89,6 +92,7 @@ public class PositionManager {
     this.ocoCorrections = meterRegistry.counter("oco.corrections");
     this.driftWatchdog = driftWatchdog;
     this.pnlAttributionService = pnlAttributionService;
+    this.tenantAccessGuard = tenantAccessGuard;
   }
 
   @Transactional
@@ -233,6 +237,7 @@ public class PositionManager {
     trade.setPrice(price);
     trade.setSide(order.getSide());
     trade.setExecutedAt(Instant.now(clock));
+    trade.setTenantId(tenantAccessGuard.requireCurrentTenant());
     TradeEntity savedTrade = tradeRepository.save(trade);
 
     BigDecimal incrementalPnl = incrementalPnl(position, lastFilled, price);
