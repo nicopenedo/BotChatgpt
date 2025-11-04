@@ -253,24 +253,42 @@ public class ReportController {
                   + "timingBps,timingCost,clientOrderId,decisionKey,decisionNote")
           .append(NEWLINE);
       for (TradeDto trade : trades) {
-        sb.append(trade.id()).append(',')
-            .append(toString(trade.executedAt())).append(',')
-            .append(nullToEmpty(trade.symbol())).append(',')
-            .append(nullToEmpty(trade.side())).append(',')
-            .append(toString(trade.price())).append(',')
-            .append(toString(trade.quantity())).append(',')
-            .append(toString(trade.fee())).append(',')
-            .append(toString(trade.feesBps())).append(',')
-            .append(toString(trade.pnl())).append(',')
-            .append(toString(trade.pnlNet())).append(',')
-            .append(toString(trade.signalEdge())).append(',')
-            .append(toString(trade.pnlR())).append(',')
-            .append(toString(trade.slippageBps())).append(',')
-            .append(toString(trade.slippageCost())).append(',')
-            .append(toString(trade.timingBps())).append(',')
-            .append(toString(trade.timingCost())).append(',')
-            .append(nullToEmpty(trade.clientOrderId())).append(',')
-            .append(nullToEmpty(trade.decisionKey())).append(',')
+        sb.append(escapeCsv(toString(trade.id())))
+            .append(",")
+            .append(escapeCsv(toString(trade.executedAt())))
+            .append(",")
+            .append(escapeCsv(nullToEmpty(trade.symbol())))
+            .append(",")
+            .append(escapeCsv(nullToEmpty(trade.side())))
+            .append(",")
+            .append(escapeCsv(toString(trade.price())))
+            .append(",")
+            .append(escapeCsv(toString(trade.quantity())))
+            .append(",")
+            .append(escapeCsv(toString(trade.fee())))
+            .append(",")
+            .append(escapeCsv(toString(trade.feesBps())))
+            .append(",")
+            .append(escapeCsv(toString(trade.pnl())))
+            .append(",")
+            .append(escapeCsv(toString(trade.pnlNet())))
+            .append(",")
+            .append(escapeCsv(toString(trade.signalEdge())))
+            .append(",")
+            .append(escapeCsv(toString(trade.pnlR())))
+            .append(",")
+            .append(escapeCsv(toString(trade.slippageBps())))
+            .append(",")
+            .append(escapeCsv(toString(trade.slippageCost())))
+            .append(",")
+            .append(escapeCsv(toString(trade.timingBps())))
+            .append(",")
+            .append(escapeCsv(toString(trade.timingCost())))
+            .append(",")
+            .append(escapeCsv(nullToEmpty(trade.clientOrderId())))
+            .append(",")
+            .append(escapeCsv(nullToEmpty(trade.decisionKey())))
+            .append(",")
             .append(escapeCsv(trade.decisionNote()))
             .append(NEWLINE);
       }
@@ -283,20 +301,33 @@ public class ReportController {
               "label,periodStart,periodEnd,trades,wins,losses,grossPnL,netPnL,fees,winRate,profitFactor,maxDrawdown,sharpe,sortino")
           .append(NEWLINE);
       for (SummaryBucket bucket : buckets) {
-        sb.append(nullToEmpty(bucket.label())).append(',')
-            .append(toString(bucket.periodStart())).append(',')
-            .append(toString(bucket.periodEnd())).append(',')
-            .append(bucket.trades()).append(',')
-            .append(bucket.wins()).append(',')
-            .append(bucket.losses()).append(',')
-            .append(toString(bucket.grossPnL())).append(',')
-            .append(toString(bucket.netPnL())).append(',')
-            .append(toString(bucket.fees())).append(',')
-            .append(toString(bucket.winRate())).append(',')
-            .append(toString(bucket.profitFactor())).append(',')
-            .append(toString(bucket.maxDrawdown())).append(',')
-            .append(toString(bucket.sharpe())).append(',')
-            .append(toString(bucket.sortino()))
+        sb.append(escapeCsv(nullToEmpty(bucket.label())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.periodStart())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.periodEnd())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.trades())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.wins())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.losses())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.grossPnL())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.netPnL())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.fees())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.winRate())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.profitFactor())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.maxDrawdown())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.sharpe())))
+            .append(",")
+            .append(escapeCsv(toString(bucket.sortino())))
             .append(NEWLINE);
       }
       return sb.toString();
@@ -306,7 +337,10 @@ public class ReportController {
       StringBuilder sb = new StringBuilder();
       sb.append("ts,value").append(NEWLINE);
       for (TimePoint point : points) {
-        sb.append(toString(point.ts())).append(',').append(toString(point.value())).append(NEWLINE);
+        sb.append(escapeCsv(toString(point.ts())))
+            .append(",")
+            .append(escapeCsv(toString(point.value())))
+            .append(NEWLINE);
       }
       return sb.toString();
     }
@@ -316,15 +350,15 @@ public class ReportController {
       sb.append("bucketX,bucketY,trades,netPnl,winRate").append(NEWLINE);
       if (heatmap != null && heatmap.cells() != null) {
         for (var cell : heatmap.cells()) {
-          sb.append(cell.x())
-              .append(',')
-              .append(cell.y())
-              .append(',')
-              .append(cell.trades())
-              .append(',')
-              .append(toString(cell.netPnl()))
-              .append(',')
-              .append(toString(cell.winRate()))
+          sb.append(escapeCsv(toString(cell.x())))
+              .append(",")
+              .append(escapeCsv(toString(cell.y())))
+              .append(",")
+              .append(escapeCsv(toString(cell.trades())))
+              .append(",")
+              .append(escapeCsv(toString(cell.netPnl())))
+              .append(",")
+              .append(escapeCsv(toString(cell.winRate())))
               .append(NEWLINE);
         }
       }
@@ -343,8 +377,8 @@ public class ReportController {
       if (value == null) {
         return "";
       }
-      if (value.contains(",") || value.contains("\"")) {
-        return '"' + value.replace("\"", """") + '"';
+      if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+        return "\"" + value.replace("\"", "\"\"") + "\"";
       }
       return value;
     }

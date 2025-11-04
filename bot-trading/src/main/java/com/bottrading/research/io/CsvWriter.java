@@ -16,7 +16,7 @@ public class CsvWriter {
     }
     StringBuilder builder = new StringBuilder();
     for (String[] row : rows) {
-      builder.append(String.join(",", row)).append('\n');
+      builder.append(String.join(",", row)).append("\n");
     }
     Files.writeString(path, builder.toString());
   }

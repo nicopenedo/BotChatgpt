@@ -79,19 +79,19 @@ public class TenantDataExportService {
           try {
             writer
                 .append(n(trade.getId()))
-                .append(',')
+                .append(",")
                 .append(trade.getPosition() != null ? n(trade.getPosition().getId()) : "")
-                .append(',')
+                .append(",")
                 .append(n(trade.getPrice()))
-                .append(',')
+                .append(",")
                 .append(n(trade.getQuantity()))
-                .append(',')
+                .append(",")
                 .append(n(trade.getFee()))
-                .append(',')
+                .append(",")
                 .append(trade.getSide() != null ? trade.getSide().name() : "")
-                .append(',')
+                .append(",")
                 .append(n(trade.getExecutedAt()))
-                .append('\n');
+                .append("\n");
           } catch (IOException ex) {
             throw new UncheckedIOException(ex);
           }
@@ -122,19 +122,19 @@ public class TenantDataExportService {
           try {
             writer
                 .append(n(fill.getId()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getOrderId()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getRefPrice()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getFillPrice()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getSlippageBps()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getSymbol()))
-                .append(',')
+                .append(",")
                 .append(n(fill.getExecutedAt()))
-                .append('\n');
+                .append("\n");
           } catch (IOException ex) {
             throw new UncheckedIOException(ex);
           }

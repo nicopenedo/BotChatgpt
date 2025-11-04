@@ -25,7 +25,7 @@ public class TelegramAnomalyAlertPublisher implements AnomalyAlertPublisher {
     builder
         .append("Anomaly ")
         .append(notification.symbol())
-        .append(' ')
+        .append(" ")
         .append(notification.metric().id())
         .append(" severity=")
         .append(notification.severity().name())
@@ -48,7 +48,7 @@ public class TelegramAnomalyAlertPublisher implements AnomalyAlertPublisher {
           .append(minutes)
           .append("m (until ")
           .append(FORMATTER.format(expires))
-          .append(')');
+          .append(")");
     }
     notifier.notifyError(builder.toString());
   }
