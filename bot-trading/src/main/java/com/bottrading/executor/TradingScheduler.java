@@ -483,13 +483,20 @@ public class TradingScheduler {
   private record DecisionContext(
       String decisionKey, String symbol, String interval, long closeTime, Instant decidedAt, String source) {}
 
-  private record DecisionRecord(StrategyDecision decision, DecisionContext context) {
+  private static final class DecisionRecord {
+    private final StrategyDecision decision;
+    private final DecisionContext context;
     private String reason = "";
     private boolean executed;
     private String orderId;
 
+    private DecisionRecord(StrategyDecision decision, DecisionContext context) {
+      this.decision = decision;
+      this.context = context;
+    }
+
     public DecisionRecord reason(String reason) {
-      this.reason = reason;
+      this.reason = (reason != null ? reason : "");
       return this;
     }
 
@@ -501,6 +508,14 @@ public class TradingScheduler {
     public DecisionRecord orderId(String orderId) {
       this.orderId = orderId;
       return this;
+    }
+
+    public StrategyDecision decision() {
+      return decision;
+    }
+
+    public DecisionContext context() {
+      return context;
     }
 
     public String reason() {
