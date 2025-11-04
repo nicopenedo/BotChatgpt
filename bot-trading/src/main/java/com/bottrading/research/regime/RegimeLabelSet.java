@@ -80,9 +80,9 @@ public class RegimeLabelSet {
       for (RegimeLabel label : ordered) {
         writer
             .append(label.timestamp().toString())
-            .append(',')
+            .append(",")
             .append(label.trend().name())
-            .append(',')
+            .append(",")
             .append(label.volatility().name());
         writer.newLine();
       }

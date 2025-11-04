@@ -113,6 +113,6 @@ public class GaProgressReporter implements GaListener {
     if (value == null) {
       return "";
     }
-    return '"' + value.replace("\"", "'") + '"';
+    return "\"" + value.replace("\"", "'") + "\"";
   }
 }

@@ -149,7 +149,7 @@ public class IndicatorController {
     static String points(List<IndicatorPoint> points) {
       StringBuilder sb = new StringBuilder("ts,value").append(NEWLINE);
       for (IndicatorPoint point : points) {
-        sb.append(point.ts()).append(',').append(point.value()).append(NEWLINE);
+        sb.append(point.ts()).append(",").append(point.value()).append(NEWLINE);
       }
       return sb.toString();
     }
@@ -158,11 +158,11 @@ public class IndicatorController {
       StringBuilder sb = new StringBuilder("ts,mid,upper,lower").append(NEWLINE);
       for (AtrBandPoint point : points) {
         sb.append(point.ts())
-            .append(',')
+            .append(",")
             .append(point.mid())
-            .append(',')
+            .append(",")
             .append(point.upper())
-            .append(',')
+            .append(",")
             .append(point.lower())
             .append(NEWLINE);
       }
@@ -173,9 +173,9 @@ public class IndicatorController {
       StringBuilder sb = new StringBuilder("ts,trend,line").append(NEWLINE);
       for (SupertrendPoint point : points) {
         sb.append(point.ts())
-            .append(',')
+            .append(",")
             .append(point.trend())
-            .append(',')
+            .append(",")
             .append(point.line())
             .append(NEWLINE);
       }
