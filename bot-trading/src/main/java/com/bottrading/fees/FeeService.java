@@ -4,6 +4,7 @@ import com.bottrading.config.FeeProperties;
 import com.bottrading.service.binance.BinanceClient;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -48,8 +49,12 @@ public class FeeService {
               }
               FeeInfo calculated = new FeeInfo(maker, taker, vipLevel, payingWithBnb);
               lastFees.put(symbol, calculated);
-              meterRegistry.gauge("fees.effective.maker", Tags.of("symbol", symbol), calculated, FeeInfo::makerAsDouble);
-              meterRegistry.gauge("fees.effective.taker", Tags.of("symbol", symbol), calculated, FeeInfo::takerAsDouble);
+              Gauge.builder("fees.effective.maker", calculated, FeeInfo::makerAsDouble)
+                  .tags("symbol", symbol)
+                  .register(meterRegistry);
+              Gauge.builder("fees.effective.taker", calculated, FeeInfo::takerAsDouble)
+                  .tags("symbol", symbol)
+                  .register(meterRegistry);
               return calculated;
             });
     lastFees.put(symbol, info);

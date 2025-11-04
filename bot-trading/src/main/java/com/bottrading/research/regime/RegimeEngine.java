@@ -3,6 +3,7 @@ package com.bottrading.research.regime;
 import com.bottrading.model.dto.Kline;
 import com.bottrading.strategy.Series;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -197,18 +198,14 @@ public class RegimeEngine {
       this.symbol = symbol;
       this.changesCounter = meterRegistry.counter("regime.changes", Tags.of("symbol", symbol));
       for (RegimeTrend trend : RegimeTrend.values()) {
-        meterRegistry.gauge(
-            "regime.time_share",
-            Tags.of("symbol", symbol, "type", "trend", "value", trend.name()),
-            this,
-            state -> state.trendShare(trend));
+        Gauge.builder("regime.time_share", this, state -> state.trendShare(trend))
+            .tags("symbol", symbol, "type", "trend", "value", trend.name())
+            .register(meterRegistry);
       }
       for (RegimeVolatility vol : RegimeVolatility.values()) {
-        meterRegistry.gauge(
-            "regime.time_share",
-            Tags.of("symbol", symbol, "type", "vol", "value", vol.name()),
-            this,
-            state -> state.volShare(vol));
+        Gauge.builder("regime.time_share", this, state -> state.volShare(vol))
+            .tags("symbol", symbol, "type", "vol", "value", vol.name())
+            .register(meterRegistry);
       }
     }
 

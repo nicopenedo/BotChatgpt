@@ -13,6 +13,7 @@ import com.bottrading.repository.DecisionRepository;
 import com.bottrading.repository.PnlAttributionRepository;
 import com.bottrading.repository.TradeFillRepository;
 import com.bottrading.service.market.MarketDataService;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -61,8 +62,10 @@ public class PnlAttributionService {
     this.marketDataService = marketDataService;
     this.feeService = feeService;
     this.meterRegistry = meterRegistry;
-    meterRegistry.gauge("attr.timing.avg_bps", timingGauge, AtomicReference::get);
-    meterRegistry.gauge("attr.fees.avg_bps", feesGauge, AtomicReference::get);
+    Gauge.builder("attr.timing.avg_bps", timingGauge, AtomicReference::get)
+        .register(meterRegistry);
+    Gauge.builder("attr.fees.avg_bps", feesGauge, AtomicReference::get)
+        .register(meterRegistry);
   }
 
   @Transactional
@@ -249,7 +252,9 @@ public class PnlAttributionService {
               symbol,
               key -> {
                 SymbolStats created = new SymbolStats();
-                meterRegistry.gauge("attr.slippage.avg_bps", Tags.of("symbol", key), created.averageBps, AtomicReference::get);
+                Gauge.builder("attr.slippage.avg_bps", created.averageBps, AtomicReference::get)
+                    .tags("symbol", key)
+                    .register(meterRegistry);
                 return created;
               });
       stats.accumulate(slippageBps.doubleValue(), notional);

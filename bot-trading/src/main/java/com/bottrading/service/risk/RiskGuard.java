@@ -8,6 +8,7 @@ import com.bottrading.saas.security.TenantContext;
 import com.bottrading.saas.service.TenantAccountService;
 import com.bottrading.saas.service.TenantMetrics;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -87,18 +88,33 @@ public class RiskGuard {
     this.tenantMetrics = tenantMetrics;
     this.tenantAccountService = tenantAccountService;
     Tags tags = tenantMetrics.tags(tradingProperties.getSymbol());
-    meterRegistry.gauge("risk.equity", tags, currentEquity, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.daily_pnl", tags, dailyPnl, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.dd_max", tags, maxDrawdownPct, ref -> ref.get().doubleValue());
-    meterRegistry.gauge("risk.api_error_rate", tags, apiErrorRate, ref -> ref.get());
-    meterRegistry.gauge("risk.ws_reconnects", tags, wsReconnectGauge, AtomicInteger::get);
-    meterRegistry.gauge("bot.mode", tags, modeGauge, AtomicInteger::get);
-    meterRegistry.gauge("risk.market_data_stale", tags, marketDataGauge, AtomicInteger::get);
-    meterRegistry.gauge(
-        "risk.daily_loss.limit_pct",
-        tags,
-        riskProperties,
-        props -> props.getMaxDailyLossPct() != null ? props.getMaxDailyLossPct().doubleValue() : 0.0);
+    Gauge.builder("risk.equity", currentEquity, ref -> ref.get().doubleValue())
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("risk.daily_pnl", dailyPnl, ref -> ref.get().doubleValue())
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("risk.dd_max", maxDrawdownPct, ref -> ref.get().doubleValue())
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("risk.api_error_rate", apiErrorRate, AtomicReference::get)
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("risk.ws_reconnects", wsReconnectGauge, AtomicInteger::get)
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("bot.mode", modeGauge, AtomicInteger::get)
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder("risk.market_data_stale", marketDataGauge, AtomicInteger::get)
+        .tags(tags)
+        .register(meterRegistry);
+    Gauge.builder(
+            "risk.daily_loss.limit_pct",
+            riskProperties,
+            props -> props.getMaxDailyLossPct() != null ? props.getMaxDailyLossPct().doubleValue() : 0.0)
+        .tags(tags)
+        .register(meterRegistry);
     updateModeGauge();
   }
 

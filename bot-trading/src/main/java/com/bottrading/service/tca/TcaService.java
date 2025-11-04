@@ -6,6 +6,7 @@ import com.bottrading.model.enums.OrderType;
 import com.bottrading.model.entity.TradeFillEntity;
 import com.bottrading.repository.TradeFillRepository;
 import com.bottrading.saas.security.TenantAccessGuard;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -193,9 +194,11 @@ public class TcaService {
           averageGauge.computeIfAbsent(
               sample.symbol(),
               sym -> {
-                AtomicReference<Double> ref = new AtomicReference<>(0.0);
-                meterRegistry.gauge("tca.slippage.avg_bps", Tags.of("symbol", sym), ref, AtomicReference::get);
-                return ref;
+              AtomicReference<Double> ref = new AtomicReference<>(0.0);
+              Gauge.builder("tca.slippage.avg_bps", ref, AtomicReference::get)
+                  .tags("symbol", sym)
+                  .register(meterRegistry);
+              return ref;
               });
       gaugeRef.set(avg);
       meterRegistry.counter("tca.samples", Tags.of("symbol", sample.symbol(), "type", sample.type().name())).increment();

@@ -22,7 +22,6 @@
         <java.version>21</java.version>
         <spring.boot.version>${project.parent.version}</spring.boot.version>
         <resilience4j.version>2.2.0</resilience4j.version>
-        <bucket4j.version>0.10.1</bucket4j.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
     </properties>
 
@@ -85,9 +84,9 @@
             <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.giffing.bucket4j.spring.boot.starter</groupId>
-            <artifactId>bucket4j-spring-boot-starter</artifactId>
-            <version>${bucket4j.version}</version>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j-core</artifactId>
+            <version>8.10.1</version>
         </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
@@ -100,7 +99,11 @@
         <dependency>
             <groupId>org.knowm.xchart</groupId>
             <artifactId>xchart</artifactId>
-            <version>3.8.6</version>
+            <version>3.8.8</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
         <dependency>
             <groupId>org.yaml</groupId>

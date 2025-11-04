@@ -26,6 +26,7 @@ import com.bottrading.service.preset.PresetService;
 import com.bottrading.service.preset.PresetService.BacktestMetadata;
 import com.bottrading.service.preset.PresetService.PresetImportRequest;
 import com.bottrading.service.snapshot.SnapshotService;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
@@ -96,7 +97,8 @@ public class ResearchNightlyPipeline {
     this.notifier = notifier;
     this.clock = clock.orElse(Clock.systemUTC());
     this.meterRegistry = meterRegistry;
-    meterRegistry.gauge("research.nightly.last_duration.seconds", lastDurationSeconds, AtomicReference::get);
+    Gauge.builder("research.nightly.last_duration.seconds", lastDurationSeconds, AtomicReference::get)
+        .register(meterRegistry);
   }
 
   public void runNightly() {
@@ -185,7 +187,7 @@ public class ResearchNightlyPipeline {
       Path baseDir)
       throws IOException, InterruptedException {
     ResearchProperties.Ga ga = nightly.getGa();
-    ResearchProperties.Gate gate = nightly.getGate();
+    ResearchProperties.Nightly.Gate gate = nightly.getGate();
 
     String runId =
         "nightly-" + trend.name().toLowerCase() + "-" + LocalDate.now(clock).toString();

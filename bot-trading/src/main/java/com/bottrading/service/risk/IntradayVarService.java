@@ -13,6 +13,7 @@ import com.bottrading.repository.ShadowPositionRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.math.BigDecimal;
@@ -295,15 +296,18 @@ public class IntradayVarService {
     AtomicReference<Double> ref =
         cvarGauges.computeIfAbsent(
             key,
-            k ->
-                meterRegistry.gauge(
-                    "var.cvar_q",
-                    Tags.concat(
-                        tenantMetrics.tags(k.symbol()),
-                        Tags.of(
-                            "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
-                            "preset", Optional.ofNullable(k.presetKey()).orElse("default"))),
-                    new AtomicReference<>(0.0)));
+            k -> {
+              AtomicReference<Double> reference = new AtomicReference<>(0.0);
+              Gauge.builder("var.cvar_q", reference, AtomicReference::get)
+                  .tags(
+                      Tags.concat(
+                          tenantMetrics.tags(k.symbol()),
+                          Tags.of(
+                              "regime", Optional.ofNullable(k.regimeTrend()).orElse("UNKNOWN"),
+                              "preset", Optional.ofNullable(k.presetKey()).orElse("default"))))
+                  .register(meterRegistry);
+              return reference;
+            });
     ref.set(cvar);
     ratioSummaries
         .computeIfAbsent(

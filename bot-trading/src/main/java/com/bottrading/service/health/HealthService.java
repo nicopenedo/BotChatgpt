@@ -3,6 +3,7 @@ package com.bottrading.service.health;
 import com.bottrading.config.TradingProps;
 import com.bottrading.service.anomaly.AnomalyDetector;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.time.Duration;
@@ -30,8 +31,11 @@ public class HealthService {
       TradingProps tradingProps, MeterRegistry meterRegistry, AnomalyDetector anomalyDetector) {
     this.tradingProps = tradingProps;
     this.pauses = meterRegistry.counter("health.pauses");
-    meterRegistry.gauge("health.api.error.rate", errorRate, AtomicReference::get);
-    meterRegistry.gauge("health.status", Tags.empty(), healthy, flag -> flag.get() ? 1.0 : 0.0);
+    Gauge.builder("health.api.error.rate", errorRate, AtomicReference::get)
+        .register(meterRegistry);
+    Gauge.builder("health.status", healthy, flag -> flag.get() ? 1.0 : 0.0)
+        .tags(Tags.empty())
+        .register(meterRegistry);
     this.anomalyDetector = anomalyDetector;
   }
 
