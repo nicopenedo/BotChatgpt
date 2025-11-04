@@ -5,6 +5,7 @@ import com.bottrading.config.ChaosProperties.GapPattern;
 import com.bottrading.executor.KlineEvent;
 import com.bottrading.service.risk.RiskGuard;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import jakarta.annotation.PostConstruct;
@@ -60,8 +61,12 @@ public class ChaosSuite {
     this.clock = Objects.requireNonNull(clock, "clock");
     this.wsDrops = meterRegistry.counter("chaos.ws_drops", Tags.empty());
     this.api429 = meterRegistry.counter("chaos.api_429", Tags.empty());
-    meterRegistry.gauge("chaos.latency_mult", Tags.empty(), latencyGauge, AtomicReference::get);
-    meterRegistry.gauge("chaos.active", Tags.empty(), activeGauge, AtomicInteger::get);
+    Gauge.builder("chaos.latency_mult", latencyGauge, AtomicReference::get)
+        .tags(Tags.empty())
+        .register(meterRegistry);
+    Gauge.builder("chaos.active", activeGauge, AtomicInteger::get)
+        .tags(Tags.empty())
+        .register(meterRegistry);
     this.safetyExecutor =
         Executors.newSingleThreadScheduledExecutor(
             new ChaosThreadFactory("chaos-safety"));

@@ -3,6 +3,7 @@ package com.bottrading.bandit;
 import com.bottrading.saas.service.TenantMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.util.Map;
@@ -50,19 +51,18 @@ public class BanditMetrics {
             symbol,
             key -> {
               AtomicReference<Double> ref = new AtomicReference<>(0.0);
-              meterRegistry.gauge(
-                  "bandit.canary.share",
-                  tenantMetrics.tags(key),
-                  ref,
-                  AtomicReference::get);
+              Gauge.builder("bandit.canary.share", ref, AtomicReference::get)
+                  .tags(tenantMetrics.tags(key))
+                  .register(meterRegistry);
               return ref;
             })
         .set(share);
   }
 
   public void registerAlgorithm(String algorithm) {
-    meterRegistry.gauge(
-        "bandit.algorithm", Tags.concat(tenantMetrics.tags(null), Tags.of("value", algorithm)), 1);
+    Gauge.builder("bandit.algorithm", () -> 1.0)
+        .tags(Tags.concat(tenantMetrics.tags(null), Tags.of("value", algorithm)))
+        .register(meterRegistry);
   }
 
   private Counter counterFor(BanditArmEntity arm, String metric) {

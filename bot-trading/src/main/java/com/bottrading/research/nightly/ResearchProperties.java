@@ -81,6 +81,63 @@ public class ResearchProperties {
     public void setReporting(Reporting reporting) {
       this.reporting = reporting;
     }
+
+    public static class Gate {
+      private double epsilonPf = 0.10;
+      private double maxddCapPct = 8.0;
+      private int minTradesOos = 150;
+      private int shadowMinTrades = 50;
+      private double shadowPfDropTolerance = 0.15;
+      private double pfBaseline = 1.0;
+
+      public double getEpsilonPf() {
+        return epsilonPf;
+      }
+
+      public void setEpsilonPf(double epsilonPf) {
+        this.epsilonPf = epsilonPf;
+      }
+
+      public double getMaxddCapPct() {
+        return maxddCapPct;
+      }
+
+      public void setMaxddCapPct(double maxddCapPct) {
+        this.maxddCapPct = maxddCapPct;
+      }
+
+      public int getMinTradesOos() {
+        return minTradesOos;
+      }
+
+      public void setMinTradesOos(int minTradesOos) {
+        this.minTradesOos = minTradesOos;
+      }
+
+      public int getShadowMinTrades() {
+        return shadowMinTrades;
+      }
+
+      public void setShadowMinTrades(int shadowMinTrades) {
+        this.shadowMinTrades = shadowMinTrades;
+      }
+
+      public double getShadowPfDropTolerance() {
+        return shadowPfDropTolerance;
+      }
+
+      public void setShadowPfDropTolerance(double shadowPfDropTolerance) {
+        this.shadowPfDropTolerance = shadowPfDropTolerance;
+      }
+
+      public double getPfBaseline() {
+        return pfBaseline;
+      }
+
+      public void setPfBaseline(double pfBaseline) {
+        this.pfBaseline = pfBaseline;
+      }
+    }
   }
 
   public static class Dataset {
@@ -248,63 +305,6 @@ public class ResearchProperties {
 
     public void setUseDynamicFees(boolean useDynamicFees) {
       this.useDynamicFees = useDynamicFees;
-    }
-  }
-
-  public static class Gate {
-    private double epsilonPf = 0.10;
-    private double maxddCapPct = 8.0;
-    private int minTradesOos = 150;
-    private int shadowMinTrades = 50;
-    private double shadowPfDropTolerance = 0.15;
-    private double pfBaseline = 1.0;
-
-    public double getEpsilonPf() {
-      return epsilonPf;
-    }
-
-    public void setEpsilonPf(double epsilonPf) {
-      this.epsilonPf = epsilonPf;
-    }
-
-    public double getMaxddCapPct() {
-      return maxddCapPct;
-    }
-
-    public void setMaxddCapPct(double maxddCapPct) {
-      this.maxddCapPct = maxddCapPct;
-    }
-
-    public int getMinTradesOos() {
-      return minTradesOos;
-    }
-
-    public void setMinTradesOos(int minTradesOos) {
-      this.minTradesOos = minTradesOos;
-    }
-
-    public int getShadowMinTrades() {
-      return shadowMinTrades;
-    }
-
-    public void setShadowMinTrades(int shadowMinTrades) {
-      this.shadowMinTrades = shadowMinTrades;
-    }
-
-    public double getShadowPfDropTolerance() {
-      return shadowPfDropTolerance;
-    }
-
-    public void setShadowPfDropTolerance(double shadowPfDropTolerance) {
-      this.shadowPfDropTolerance = shadowPfDropTolerance;
-    }
-
-    public double getPfBaseline() {
-      return pfBaseline;
-    }
-
-    public void setPfBaseline(double pfBaseline) {
-      this.pfBaseline = pfBaseline;
     }
   }
 

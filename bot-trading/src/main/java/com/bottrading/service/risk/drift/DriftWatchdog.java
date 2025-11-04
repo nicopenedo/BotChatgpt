@@ -3,6 +3,7 @@ package com.bottrading.service.risk.drift;
 import com.bottrading.config.TradingProps;
 import com.bottrading.service.risk.TradingState;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.time.Instant;
@@ -32,8 +33,12 @@ public class DriftWatchdog {
     this.liveWindow = new PerformanceWindow(tradingProps.getDrift().getWindowTrades());
     this.shadowWindow = new PerformanceWindow(tradingProps.getDrift().getWindowTrades());
     this.downgradeCounter = meterRegistry.counter("drift.downgrades", Tags.empty());
-    meterRegistry.gauge("drift.stage", Tags.empty(), stage, st -> st.get().ordinal());
-    meterRegistry.gauge("drift.sizing.multiplier", Tags.empty(), sizingMultiplier, AtomicReference::get);
+    Gauge.builder("drift.stage", stage, st -> st.get().ordinal())
+        .tags(Tags.empty())
+        .register(meterRegistry);
+    Gauge.builder("drift.sizing.multiplier", sizingMultiplier, AtomicReference::get)
+        .tags(Tags.empty())
+        .register(meterRegistry);
   }
 
   public void recordLiveTrade(String symbol, double pnl) {

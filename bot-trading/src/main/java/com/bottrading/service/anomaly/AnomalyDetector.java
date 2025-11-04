@@ -4,6 +4,7 @@ import com.bottrading.config.AnomalyProperties;
 import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.risk.RiskFlag;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.time.Clock;
@@ -128,11 +129,9 @@ public class AnomalyDetector {
             key,
             ignored -> {
               AtomicReference<Double> ref = new AtomicReference<>(0.0);
-              meterRegistry.gauge(
-                  "anomaly.metric",
-                  Tags.of("symbol", symbol, "metric", metric.id()),
-                  ref,
-                  AtomicReference::get);
+              Gauge.builder("anomaly.metric", ref, AtomicReference::get)
+                  .tags("symbol", symbol, "metric", metric.id())
+                  .register(meterRegistry);
               return ref;
             });
     gauge.set(value);
@@ -227,7 +226,9 @@ public class AnomalyDetector {
 
   private SymbolState newSymbolState(String symbol) {
     AtomicInteger gauge = new AtomicInteger(0);
-    meterRegistry.gauge("anomaly.state", Tags.of("symbol", symbol), gauge, AtomicInteger::get);
+    Gauge.builder("anomaly.state", gauge, AtomicInteger::get)
+        .tags("symbol", symbol)
+        .register(meterRegistry);
     return new SymbolState(symbol, gauge);
   }
 

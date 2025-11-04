@@ -2,6 +2,7 @@ package com.bottrading.throttle;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import jakarta.annotation.PreDestroy;
@@ -74,17 +75,15 @@ public class Throttle {
             .baseUnit("milliseconds")
             .description("Delay between submission and execution")
             .register(meterRegistry);
-    meterRegistry.gauge("queue.depth", Tags.of("symbol", "global"), globalDepth);
-    meterRegistry.gauge(
-        "throttle.budget.remaining",
-        Tags.of("window", "1s"),
-        budget,
-        value -> budget.remainingBudget1s(System.nanoTime()));
-    meterRegistry.gauge(
-        "throttle.budget.remaining",
-        Tags.of("window", "60s"),
-        budget,
-        value -> budget.remainingBudget60s(System.nanoTime()));
+    Gauge.builder("queue.depth", globalDepth, AtomicInteger::get)
+        .tags("symbol", "global")
+        .register(meterRegistry);
+    Gauge.builder("throttle.budget.remaining", budget, value -> budget.remainingBudget1s(System.nanoTime()))
+        .tags("window", "1s")
+        .register(meterRegistry);
+    Gauge.builder("throttle.budget.remaining", budget, value -> budget.remainingBudget60s(System.nanoTime()))
+        .tags("window", "60s")
+        .register(meterRegistry);
   }
 
   public <T> CompletionStage<T> submit(Endpoint endpoint, String symbol, Supplier<T> supplier) {
@@ -157,8 +156,9 @@ public class Throttle {
 
   private SymbolQueue createQueue(String symbol) {
     SymbolQueue queue = new SymbolQueue(symbol);
-    meterRegistry.gauge(
-        "queue.depth", Tags.of("symbol", symbol), queue, value -> value.depth.get());
+    Gauge.builder("queue.depth", queue, value -> value.depth.get())
+        .tags("symbol", symbol)
+        .register(meterRegistry);
     return queue;
   }
 

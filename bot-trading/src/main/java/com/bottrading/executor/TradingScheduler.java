@@ -128,7 +128,9 @@ public class TradingScheduler {
         Timer.builder("scheduler.candle.duration.ms")
             .publishPercentileHistogram()
             .register(meterRegistry);
-    meterRegistry.gauge("scheduler.candle.enabled", Tags.empty(), enabled, value -> value.get() ? 1.0 : 0.0);
+    Gauge.builder("scheduler.candle.enabled", enabled, flag -> flag.get() ? 1.0 : 0.0)
+        .tags(Tags.empty())
+        .register(meterRegistry);
     registerBacklogGauge(tradingProps.getSymbol());
     for (String symbol : tradingProps.getSymbols()) {
       registerBacklogGauge(symbol);
