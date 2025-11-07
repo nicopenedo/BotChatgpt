@@ -1,20 +1,18 @@
 package com.bottrading.cli;
 
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine;
-import picocli.spring.boot.autoconfigure.PicocliSpringFactory;
 
 @Component
 public class CliRunner implements CommandLineRunner {
 
   private final BotRootCommand rootCommand;
-  private final CommandLine.IFactory commandLineFactory;
+  private final CommandLine.IFactory factory;
 
-  public CliRunner(BotRootCommand rootCommand, ApplicationContext applicationContext) {
+  public CliRunner(BotRootCommand rootCommand, CommandLine.IFactory factory) {
     this.rootCommand = rootCommand;
-    this.commandLineFactory = new PicocliSpringFactory(applicationContext);
+    this.factory = factory;
   }
 
   @Override
@@ -25,7 +23,7 @@ public class CliRunner implements CommandLineRunner {
     if (!rootCommand.handles(args[0])) {
       return;
     }
-    CommandLine commandLine = new CommandLine(rootCommand, commandLineFactory);
+    CommandLine commandLine = new CommandLine(rootCommand, factory);
     int exitCode = commandLine.execute(args);
     if (exitCode != 0) {
       System.exit(exitCode);

@@ -12,13 +12,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+@Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
   private final TradingProps properties;
@@ -40,16 +41,21 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       return;
     }
 
-    Bucket bucket = buckets.computeIfAbsent(resolveKey(request), key -> Bucket4j.builder().addLimit(limit).build());
+    Bucket bucket = resolveBucket(resolveKey(request));
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     long remaining = Math.max(0, probe.getRemainingTokens());
     response.setHeader("X-Rate-Limit-Remaining", Long.toString(remaining));
-    response.setHeader("X-Rate-Limit-Reset", resetHeaderValue(probe));
-    if (!probe.isConsumed()) {
-      response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+    if (probe.isConsumed()) {
+      filterChain.doFilter(request, response);
       return;
     }
-    filterChain.doFilter(request, response);
+    long waitForRefill = probe.getNanosToWaitForRefill();
+    response.setHeader("Retry-After", String.valueOf(Duration.ofNanos(waitForRefill).toSeconds()));
+    response.sendError(HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many Requests");
+  }
+
+  private Bucket resolveBucket(String key) {
+    return buckets.computeIfAbsent(key, k -> Bucket4j.builder().addLimit(limit).build());
   }
 
   private String resolveKey(HttpServletRequest request) {
@@ -69,14 +75,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
     String remoteAddr = request.getRemoteAddr();
     return remoteAddr != null ? remoteAddr : "unknown";
-  }
-
-  private String resetHeaderValue(ConsumptionProbe probe) {
-    long nanosToWait = probe.getNanosToWaitForRefill();
-    if (nanosToWait <= 0) {
-      return "0";
-    }
-    Instant reset = Instant.now().plusNanos(nanosToWait);
-    return Long.toString(reset.getEpochSecond());
   }
 }
