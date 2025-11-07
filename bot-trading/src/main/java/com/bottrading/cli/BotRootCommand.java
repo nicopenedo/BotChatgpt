@@ -8,6 +8,7 @@ import com.bottrading.cli.preset.PresetsRetireCommand;
 import com.bottrading.cli.preset.PresetsRollbackCommand;
 import com.bottrading.cli.preset.PresetsSnapshotCommand;
 import com.bottrading.cli.leaderboard.LeaderboardCliCommand;
+import com.bottrading.cli.security.MigrateTotpSecretsCommand;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine;
 
@@ -18,7 +19,8 @@ import picocli.CommandLine;
       PresetsCommand.class,
       LeaderboardCliCommand.class,
       BacktestCliCommand.class,
-      BillingCliCommand.class
+      BillingCliCommand.class,
+      MigrateTotpSecretsCommand.class
     },
     mixinStandardHelpOptions = true,
     description = "Bot management CLI")
@@ -31,7 +33,7 @@ public class BotRootCommand implements Runnable {
 
   public boolean handles(String arg) {
     return switch (arg) {
-      case "presets", "leaderboard", "bt", "billing" -> true;
+      case "presets", "leaderboard", "bt", "billing", "migrate-totp-secrets" -> true;
       default -> false;
     };
   }

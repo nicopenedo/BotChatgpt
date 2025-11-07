@@ -45,3 +45,7 @@ management:
     web:
       exposure:
         include: "health,info"
+
+security:
+  totp:
+    secret-encoding: base32 # valores: base32 (default), base64 (solo lectura)
