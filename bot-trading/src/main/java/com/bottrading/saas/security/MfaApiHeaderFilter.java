@@ -1,5 +1,6 @@
 package com.bottrading.saas.security;
 
+import com.bottrading.saas.service.TotpService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,7 +30,7 @@ public class MfaApiHeaderFilter extends OncePerRequestFilter {
       Object principal = authentication.getPrincipal();
       if (principal instanceof TenantUserDetails details && details.isMfaEnabled()) {
         String totp = request.getHeader("X-TOTP");
-        if (!totpService.verify(details.getMfaSecret(), totp)) {
+        if (!totpService.verify(totpService.fromBase32(details.getMfaSecret()), totp)) {
           response.setStatus(HttpStatus.UNAUTHORIZED.value());
           response.getWriter().write("Invalid or missing MFA token");
           return;

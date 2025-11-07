@@ -1,11 +1,11 @@
 package com.bottrading.config;
 
 import com.bottrading.saas.security.TenantContext;
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Bucket4j;
-import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.Refill;
+import com.bucket4j.Bandwidth;
+import com.bucket4j.Bucket;
+import com.bucket4j.Bucket4j;
+import com.bucket4j.ConsumptionProbe;
+import com.bucket4j.Refill;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

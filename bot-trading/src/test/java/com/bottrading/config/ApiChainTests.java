@@ -23,7 +23,7 @@ class ApiChainTests {
 
   @MockBean private TenantUserDetailsService userDetailsService;
 
-  @MockBean private com.bottrading.saas.security.TotpService totpService;
+  @MockBean private com.bottrading.saas.service.TotpService totpService;
 
   @Test
   void apiPostDoesNotRequireCsrfToken() throws Exception {

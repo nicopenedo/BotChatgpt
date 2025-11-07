@@ -1,7 +1,7 @@
 package com.bottrading.web.mvc.controller;
 
 import com.bottrading.saas.security.TenantUserDetails;
-import com.bottrading.saas.security.TotpService;
+import com.bottrading.saas.service.TotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,7 +39,7 @@ public class MfaController {
     if (authentication == null || !(authentication.getPrincipal() instanceof TenantUserDetails details)) {
       return "redirect:/login";
     }
-    if (totpService.verify(details.getMfaSecret(), code)) {
+    if (totpService.verify(totpService.fromBase32(details.getMfaSecret()), code)) {
       request.getSession(true).setAttribute("mfaVerified", Boolean.TRUE);
       return "redirect:/tenant/dashboard";
     }

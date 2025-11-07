@@ -10,6 +10,7 @@ import com.bottrading.model.enums.PresetActivationMode;
 import com.bottrading.repository.BacktestRunRepository;
 import com.bottrading.repository.PresetVersionRepository;
 import com.bottrading.research.regime.RegimeTrend;
+import com.bottrading.service.preset.BacktestMetadata;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,8 +28,8 @@ class PresetServiceTest {
 
   @Test
   void importAndActivatePreset() {
-    PresetService.BacktestMetadata metadata =
-        new PresetService.BacktestMetadata(
+    BacktestMetadata metadata =
+        new BacktestMetadata(
             "RUN_TEST",
             "BTCUSDT",
             "1h",

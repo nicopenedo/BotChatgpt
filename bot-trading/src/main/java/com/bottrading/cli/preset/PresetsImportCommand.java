@@ -1,8 +1,8 @@
 package com.bottrading.cli.preset;
 
 import com.bottrading.model.enums.OrderSide;
+import com.bottrading.service.preset.BacktestMetadata;
 import com.bottrading.service.preset.PresetService;
-import com.bottrading.service.preset.PresetService.BacktestMetadata;
 import com.bottrading.service.preset.PresetService.PresetImportRequest;
 import com.bottrading.research.regime.RegimeTrend;
 import com.fasterxml.jackson.core.type.TypeReference;

@@ -101,7 +101,7 @@ public class TenantAccountService {
       throw new AccessDeniedException("Contraseña inválida");
     }
     if (user.isMfaEnabled()) {
-      if (!totpService.verify(user.getMfaSecret(), totp)) {
+      if (!totpService.verify(totpService.fromBase32(user.getMfaSecret()), totp)) {
         throw new AccessDeniedException("Código TOTP inválido");
       }
     }
