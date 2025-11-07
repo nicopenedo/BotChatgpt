@@ -2,8 +2,8 @@ package com.bottrading.research.backtest;
 
 import com.bottrading.model.dto.Kline;
 import com.bottrading.research.ga.GenomeStrategyBuilder;
-import com.bottrading.research.ga.io.GenomeIO;
 import com.bottrading.research.ga.io.GenomeFile;
+import com.bottrading.research.ga.io.GenomeIO;
 import com.bottrading.research.backtest.realistic.RealisticExecutionSimulator;
 import com.bottrading.strategy.CompositeStrategy;
 import com.bottrading.strategy.SignalResult;
@@ -12,6 +12,7 @@ import com.bottrading.strategy.StrategyContext;
 import com.bottrading.strategy.StrategyFactory;
 import com.bottrading.research.io.DataLoader;
 import com.bottrading.research.regime.RegimeFilter;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
