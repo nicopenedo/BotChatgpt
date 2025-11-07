@@ -1,14 +1,18 @@
 package com.bottrading.saas.service;
 
 import com.eatthepath.otp.TimeBasedOneTimePasswordGenerator;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.commons.codec.binary.Base32;
 import org.springframework.stereotype.Service;
 
 public interface TotpService {
@@ -24,13 +28,18 @@ public interface TotpService {
 @Service
 class TotpServiceImpl implements TotpService {
 
+  private static final Duration STEP = Duration.ofSeconds(30);
+  private static final int DIGITS = 6;
+  private static final Base32 B32 = new Base32(false);
+  private static final Pattern SANITIZE = Pattern.compile("[\\s\\-]");
+
   private final TimeBasedOneTimePasswordGenerator totp;
 
   TotpServiceImpl() {
     try {
-      this.totp = new TimeBasedOneTimePasswordGenerator(Duration.ofSeconds(30), 6);
+      this.totp = new TimeBasedOneTimePasswordGenerator(STEP, DIGITS);
     } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException(e);
+      throw new IllegalStateException("Cannot initialize TOTP generator", e);
     }
   }
 
@@ -39,8 +48,8 @@ class TotpServiceImpl implements TotpService {
     try {
       KeyGenerator kg = KeyGenerator.getInstance("HmacSHA1");
       return kg.generateKey();
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
+    } catch (GeneralSecurityException e) {
+      throw new IllegalStateException("Cannot generate TOTP secret", e);
     }
   }
 
@@ -49,7 +58,9 @@ class TotpServiceImpl implements TotpService {
     if (key == null) {
       return null;
     }
-    return Base64.getEncoder().encodeToString(key.getEncoded());
+    byte[] raw = key.getEncoded();
+    String encoded = B32.encodeAsString(raw);
+    return encoded.replace("=", "").toUpperCase(Locale.ROOT);
   }
 
   @Override
@@ -57,34 +68,63 @@ class TotpServiceImpl implements TotpService {
     if (base32 == null || base32.isBlank()) {
       return null;
     }
-    try {
-      byte[] bytes = Base64.getDecoder().decode(base32);
-      return new SecretKeySpec(bytes, "HmacSHA1");
-    } catch (IllegalArgumentException ex) {
+    String normalized =
+        SANITIZE
+            .matcher(base32)
+            .replaceAll("")
+            .replace("_", "")
+            .replace("=", "")
+            .toUpperCase(Locale.ROOT);
+    if (normalized.isEmpty()) {
       return null;
     }
+    try {
+      String padded = normalized;
+      int remainder = normalized.length() % 8;
+      if (remainder != 0) {
+        padded = normalized + "=".repeat(8 - remainder);
+      }
+      byte[] decoded = B32.decode(padded);
+      if (decoded != null && decoded.length > 0) {
+        return new SecretKeySpec(decoded, "HmacSHA1");
+      }
+    } catch (IllegalArgumentException ignored) {
+      // Try legacy fallback below
+    }
+
+    try {
+      byte[] decoded = Base64.getDecoder().decode(base32.trim());
+      if (decoded.length > 0) {
+        return new SecretKeySpec(decoded, "HmacSHA1");
+      }
+    } catch (IllegalArgumentException ignored) {
+      // Not Base32 nor Base64
+    }
+    return null;
   }
 
   @Override
   public boolean verify(SecretKey key, String code) {
-    if (key == null || code == null) {
+    if (key == null || code == null || code.isBlank()) {
       return false;
     }
     try {
       Instant now = Instant.now();
       int current = totp.generateOneTimePassword(key, now);
-      int previous = totp.generateOneTimePassword(key, now.minus(Duration.ofSeconds(30)));
-      int next = totp.generateOneTimePassword(key, now.plus(Duration.ofSeconds(30)));
-      String formatted = String.format("%06d", current);
-      if (formatted.equals(code)) {
-        return true;
-      }
-      if (String.format("%06d", previous).equals(code)) {
-        return true;
-      }
-      return String.format("%06d", next).equals(code);
+      int previous = totp.generateOneTimePassword(key, now.minus(STEP));
+      int next = totp.generateOneTimePassword(key, now.plus(STEP));
+      String given = code.trim();
+      return given.equals(pad(current)) || given.equals(pad(previous)) || given.equals(pad(next));
     } catch (InvalidKeyException e) {
       return false;
     }
+  }
+
+  private static String pad(int value) {
+    String digits = Integer.toString(value);
+    if (digits.length() >= DIGITS) {
+      return digits;
+    }
+    return "0".repeat(DIGITS - digits.length()) + digits;
   }
 }
