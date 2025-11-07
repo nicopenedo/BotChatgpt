@@ -76,6 +76,6 @@ public class TenantSecurityService {
     if (user == null || !user.isMfaEnabled()) {
       return true;
     }
-    return totpService.verify(user.getMfaSecret(), totp);
+    return totpService.verify(totpService.fromBase32(user.getMfaSecret()), totp);
   }
 }

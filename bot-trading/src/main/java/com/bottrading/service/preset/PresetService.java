@@ -65,7 +65,7 @@ public class PresetService {
     preset.setLabelsHash(request.labelsHash());
     if (request.backtest() != null) {
       persistBacktest(request.backtest(), request.oosMetrics());
-      preset.setSourceRunId(request.backtest().runId());
+      preset.setSourceRunId(request.backtest().getRunId());
     }
     PresetVersion saved = presetRepository.save(preset);
     log.info(
@@ -243,26 +243,26 @@ public class PresetService {
     return new PromotionDecision(true, "ok");
   }
 
-  private void persistBacktest(PresetImportRequest.BacktestMetadata metadata, Map<String, Object> oos) {
+  private void persistBacktest(BacktestMetadata metadata, Map<String, Object> oos) {
     BacktestRun run =
-        backtestRunRepository.findByRunId(metadata.runId()).orElseGet(BacktestRun::new);
-    run.setRunId(metadata.runId());
-    run.setSymbol(metadata.symbol());
-    run.setInterval(metadata.interval());
-    run.setTsFrom(metadata.tsFrom());
-    run.setTsTo(metadata.tsTo());
-    run.setRegimeMask(metadata.regimeMask());
-    run.setGaPopulation(metadata.gaPopulation());
-    run.setGaGenerations(metadata.gaGenerations());
-    run.setFitnessDefinition(metadata.fitnessDefinition());
-    run.setSeed(metadata.seed());
-    run.setCodeSha(metadata.codeSha());
-    run.setDataHash(metadata.dataHash());
-    run.setLabelsHash(metadata.labelsHash());
+        backtestRunRepository.findByRunId(metadata.getRunId()).orElseGet(BacktestRun::new);
+    run.setRunId(metadata.getRunId());
+    run.setSymbol(metadata.getSymbol());
+    run.setInterval(metadata.getInterval());
+    run.setTsFrom(metadata.getTsFrom());
+    run.setTsTo(metadata.getTsTo());
+    run.setRegimeMask(metadata.getRegimeMask());
+    run.setGaPopulation(metadata.getGaPopulation());
+    run.setGaGenerations(metadata.getGaGenerations());
+    run.setFitnessDefinition(metadata.getFitnessDefinition());
+    run.setSeed(metadata.getSeed());
+    run.setCodeSha(metadata.getCodeSha());
+    run.setDataHash(metadata.getDataHash());
+    run.setLabelsHash(metadata.getLabelsHash());
     if (oos != null) {
       run.setOosMetricsJson(oos);
     }
-    run.setPerSplitMetricsJson(metadata.perSplitMetrics());
+    run.setPerSplitMetricsJson(metadata.getPerSplitMetrics());
     backtestRunRepository.save(run);
   }
 
@@ -288,22 +288,6 @@ public class PresetService {
       Map<String, Object> signalsJson,
       Map<String, Object> oosMetrics,
       BacktestMetadata backtest,
-      String codeSha,
-      String dataHash,
-      String labelsHash) {}
-
-  public record BacktestMetadata(
-      String runId,
-      String symbol,
-      String interval,
-      Instant tsFrom,
-      Instant tsTo,
-      String regimeMask,
-      Integer gaPopulation,
-      Integer gaGenerations,
-      String fitnessDefinition,
-      Long seed,
-      Map<String, Object> perSplitMetrics,
       String codeSha,
       String dataHash,
       String labelsHash) {}

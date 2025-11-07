@@ -32,7 +32,7 @@ class CsrfWebTests {
   private TenantUserDetailsService userDetailsService;
 
   @org.springframework.boot.test.mock.mockito.MockBean
-  private com.bottrading.saas.security.TotpService totpService;
+  private com.bottrading.saas.service.TotpService totpService;
 
   private TenantUserDetails uiUser() {
     return TestTenantUsers.tenantUser("user@demo.local", false);

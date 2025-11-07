@@ -1,6 +1,7 @@
 package com.bottrading.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -18,7 +19,7 @@ import com.bottrading.saas.security.MfaUiSessionFilter;
 import com.bottrading.saas.security.TenantContextFilter;
 import com.bottrading.saas.security.TenantUserDetails;
 import com.bottrading.saas.security.TenantUserDetailsService;
-import com.bottrading.saas.security.TotpService;
+import com.bottrading.saas.service.TotpService;
 import com.bottrading.web.mvc.controller.MfaController;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +71,7 @@ class MfaWebTests {
 
   @Test
   void successfulMfaUnlocksTenantArea() throws Exception {
-    when(totpService.verify(anyString(), eq("123456"))).thenReturn(true);
+    when(totpService.verify(any(), eq("123456"))).thenReturn(true);
 
     MvcResult result =
         mockMvc

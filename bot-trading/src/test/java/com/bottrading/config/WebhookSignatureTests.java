@@ -7,7 +7,7 @@ import com.bottrading.saas.security.MfaApiHeaderFilter;
 import com.bottrading.saas.security.MfaUiSessionFilter;
 import com.bottrading.saas.security.TenantContextFilter;
 import com.bottrading.saas.security.TenantUserDetailsService;
-import com.bottrading.saas.security.TotpService;
+import com.bottrading.saas.service.TotpService;
 import com.bottrading.web.api.WebhookController;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.Mac;
