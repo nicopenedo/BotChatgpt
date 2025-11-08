@@ -1,5 +1,7 @@
 package com.bottrading.service.leaderboard;
 
+// FIX: Use record-generated accessors with Java 21 visibility requirements.
+
 import com.bottrading.model.entity.BacktestRun;
 import com.bottrading.model.entity.EvaluationSnapshot;
 import com.bottrading.model.entity.PresetVersion;
@@ -159,18 +161,6 @@ public class LeaderboardService {
   private record MetricsSnapshot(Map<String, Object> metrics, String window, Instant timestamp) {
     static MetricsSnapshot empty() {
       return new MetricsSnapshot(Map.of(), "", null);
-    }
-
-    public Map<String, Object> metrics() {
-      return metrics;
-    }
-
-    public String window() {
-      return window;
-    }
-
-    public Instant timestamp() {
-      return timestamp;
     }
   }
 }

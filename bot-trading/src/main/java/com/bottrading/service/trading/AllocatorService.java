@@ -1,5 +1,7 @@
 package com.bottrading.service.trading;
 
+// FIX: Ensure AllocationDecision exposes public accessors for downstream usage.
+
 import com.bottrading.config.TradingProps;
 import com.bottrading.model.entity.PositionEntity;
 import com.bottrading.model.enums.PositionStatus;
@@ -224,6 +226,18 @@ public class AllocatorService {
 
     static AllocationDecision blocked(String reason) {
       return new AllocationDecision(false, reason, 0.0);
+    }
+
+    public boolean allowed() {
+      return allowed;
+    }
+
+    public String reason() {
+      return reason;
+    }
+
+    public double sizingMultiplier() {
+      return sizingMultiplier;
     }
   }
 

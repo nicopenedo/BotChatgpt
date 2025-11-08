@@ -1,5 +1,7 @@
 package com.bottrading.config.security;
 
+// FIX: Keep record factories/accessors compatible with Java 21 requirements.
+
 import com.bottrading.config.props.PrometheusSecurityProps;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,10 +24,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 @Component
 public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {

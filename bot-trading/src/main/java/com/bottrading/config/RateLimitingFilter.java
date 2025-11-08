@@ -1,11 +1,8 @@
 package com.bottrading.config;
 
+// FIX: Bucket4j 8.x import updates and greedy refill configuration.
+
 import com.bottrading.saas.security.TenantContext;
-import com.bucket4j.Bandwidth;
-import com.bucket4j.Bucket;
-import com.bucket4j.Bucket4j;
-import com.bucket4j.ConsumptionProbe;
-import com.bucket4j.Refill;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +12,11 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Bucket4j;
+import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.Refill;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;

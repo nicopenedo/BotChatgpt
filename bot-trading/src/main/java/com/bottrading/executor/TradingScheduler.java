@@ -1,5 +1,7 @@
 package com.bottrading.executor;
 
+// FIX: Update Micrometer Timer.Sample usage for Java 21 compatibility.
+
 import com.bottrading.config.TradingProps;
 import com.bottrading.config.TradingProps.Mode;
 import com.bottrading.chaos.ChaosSuite;
@@ -271,7 +273,7 @@ public class TradingScheduler {
         return;
       }
       lastCloseTimes.computeIfAbsent(symbol, s -> new AtomicLong(-1)).set(closeTime);
-      Timer.Sample sample = Timer.start(meterRegistry);
+      Timer.Sample sample = Timer.Sample.start(meterRegistry);
       try {
         StrategyDecision decision = strategyService.decide(symbol);
         DecisionContext context = new DecisionContext(decisionKey, symbol, interval, closeTime, now, source);
