@@ -1,5 +1,7 @@
 package com.bottrading.research.ga;
 
+// FIX: Replace method reference causing type inference issues on Java 21.
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -17,7 +19,7 @@ public class Population {
   }
 
   public void sort() {
-    genomes.sort(Comparator.comparingDouble(Genome::fitness).reversed());
+    genomes.sort(Comparator.comparingDouble(genome -> genome.fitness()).reversed());
   }
 
   public Genome best() {

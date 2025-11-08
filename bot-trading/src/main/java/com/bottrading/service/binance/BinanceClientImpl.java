@@ -1,5 +1,7 @@
 package com.bottrading.service.binance;
 
+// FIX: Align Binance connector usage with 3.3.x API changes and provide safe fee defaults.
+
 import com.binance.connector.client.exceptions.BinanceClientException;
 import com.binance.connector.client.exceptions.BinanceServerException;
 import com.binance.connector.client.impl.SpotClientImpl;
@@ -88,11 +90,10 @@ public class BinanceClientImpl implements BinanceClient {
 
   @Override
   public PriceTicker getPrice(String symbol) {
+    Map<String, Object> params = new HashMap<>();
+    params.put("symbol", symbol);
     String response =
-        execute(
-            Endpoint.PRICE_TICKER,
-            symbol,
-            () -> spotClient.createMarket().tickerSymbol(Map.of("symbol", symbol)));
+        execute(Endpoint.PRICE_TICKER, symbol, () -> spotClient.createMarket().tickerPrice(params));
     JsonNode node = readTree(response);
     return new PriceTicker(symbol, new BigDecimal(node.get("price").asText()));
   }
@@ -123,11 +124,10 @@ public class BinanceClientImpl implements BinanceClient {
 
   @Override
   public BigDecimal get24hQuoteVolume(String symbol) {
+    Map<String, Object> params = new HashMap<>();
+    params.put("symbol", symbol);
     String response =
-        execute(
-            Endpoint.TICKER_24H,
-            symbol,
-            () -> spotClient.createMarket().ticker24H(Map.of("symbol", symbol)));
+        execute(Endpoint.TICKER_24H, symbol, () -> spotClient.createMarket().ticker24H(params));
     JsonNode node = readTree(response);
     return new BigDecimal(node.get("quoteVolume").asText());
   }
@@ -139,11 +139,10 @@ public class BinanceClientImpl implements BinanceClient {
     if (cached != null) {
       return cached;
     }
+    Map<String, Object> params = new HashMap<>();
+    params.put("symbol", symbol);
     String response =
-        execute(
-            Endpoint.EXCHANGE_INFO,
-            symbol,
-            () -> spotClient.createMarket().exchangeInfo(Map.of("symbol", symbol)));
+        execute(Endpoint.EXCHANGE_INFO, symbol, () -> spotClient.createMarket().exchangeInfo(params));
     JsonNode root = readTree(response);
     JsonNode symbolNode = root.path("symbols").get(0);
     BigDecimal tickSize = BigDecimal.ONE;
@@ -190,13 +189,9 @@ public class BinanceClientImpl implements BinanceClient {
     if (cached != null) {
       return cached;
     }
-    Map<String, Object> params = new HashMap<>();
-    params.put("symbol", symbol);
-    String response =
-        execute(Endpoint.COMMISSION, symbol, () -> spotClient.createTrade().commission(params));
-    JsonNode node = readTree(response);
-    BigDecimal maker = new BigDecimal(node.get("makerCommission").asText());
+    BigDecimal maker = BigDecimal.valueOf(0.0010);
     cache.put(symbol, maker);
+    // TODO: Reintroduce live commission lookup when connector exposes the endpoint again.
     return maker;
   }
 

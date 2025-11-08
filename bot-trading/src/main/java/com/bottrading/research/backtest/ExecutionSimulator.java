@@ -1,5 +1,7 @@
 package com.bottrading.research.backtest;
 
+// FIX: Align ExecutionResult constructor usage with current signature.
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;

@@ -1,11 +1,12 @@
 package com.bottrading.research.io;
 
+// FIX: Update XChart usage for Java 21 compatibility and scatter-based trade markers.
+
 import com.bottrading.model.dto.Kline;
 import com.bottrading.research.backtest.EquityPoint;
 import com.bottrading.research.backtest.MetricsSummary;
 import com.bottrading.research.backtest.TradeRecord;
 import java.awt.Color;
-import java.awt.Font;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.StringJoiner;
 import org.knowm.xchart.BitmapEncoder;
 import org.knowm.xchart.BitmapEncoder.BitmapFormat;
 import org.knowm.xchart.OHLCChart;
@@ -25,9 +25,11 @@ import org.knowm.xchart.OHLCChartBuilder;
 import org.knowm.xchart.XYChart;
 import org.knowm.xchart.XYChartBuilder;
 import org.knowm.xchart.XYSeries;
-import org.knowm.xchart.annotations.XYTextAnnotation;
+import org.knowm.xchart.XYSeries.XYSeriesRenderStyle;
 import org.knowm.xchart.internal.chartpart.Chart;
 import org.knowm.xchart.style.Styler.LegendPosition;
+import org.knowm.xchart.style.lines.SeriesLines;
+import org.knowm.xchart.style.markers.SeriesMarkers;
 
 public class ChartExporter {
 
@@ -55,7 +57,7 @@ public class ChartExporter {
       return;
     }
     Files.createDirectories(directory);
-    exportPriceChart(directory.resolve("price_with_trades.png"), symbol, runId, klines, trades, metrics);
+    exportPriceChart(directory.resolve("price_with_trades.png"), symbol, runId, klines, trades);
     exportEquityChart(directory.resolve("equity_curve.png"), equityCurve);
     exportDrawdownChart(directory.resolve("drawdown.png"), equityCurve);
   }
@@ -65,8 +67,7 @@ public class ChartExporter {
       String symbol,
       String runId,
       List<Kline> klines,
-      List<TradeRecord> trades,
-      MetricsSummary metrics)
+      List<TradeRecord> trades)
       throws IOException {
     if (klines == null || klines.isEmpty()) {
       return;
@@ -101,7 +102,6 @@ public class ChartExporter {
     chart.addSeries("Precio", dates, opens, highs, lows, closes);
 
     addTradeMarkers(chart, trades);
-    annotateMetrics(chart, metrics, klines, highs);
 
     saveChart(chart, output);
   }
@@ -110,71 +110,31 @@ public class ChartExporter {
     if (trades == null || trades.isEmpty()) {
       return;
     }
+    List<Date> entryTimes = new ArrayList<>();
+    List<Double> entryPrices = new ArrayList<>();
+    List<Date> exitTimes = new ArrayList<>();
+    List<Double> exitPrices = new ArrayList<>();
     for (TradeRecord trade : trades) {
-      addTradeAnnotation(chart, trade);
+      entryTimes.add(Date.from(trade.entryTime()));
+      entryPrices.add(trade.entryPrice().doubleValue());
+      exitTimes.add(Date.from(trade.exitTime()));
+      exitPrices.add(trade.exitPrice().doubleValue());
     }
-  }
 
-  private void addTradeAnnotation(OHLCChart chart, TradeRecord trade) {
-    String entryLabel =
-        "✅ "
-            + trade.side()
-            + " "
-            + LABEL_TIME_FORMAT.format(trade.entryTime())
-            + "\nPrecio: "
-            + formatPrice(trade.entryPrice())
-            + "\nSeñales: "
-            + summarizeSignals(trade.entrySignals())
-            + "\nMotivo: "
-            + safeText(trade.entryReason());
-    XYTextAnnotation entryAnnotation =
-        new XYTextAnnotation(
-            entryLabel,
-            Date.from(trade.entryTime()).getTime(),
-            trade.entryPrice().doubleValue());
-    entryAnnotation.setFont(new Font("SansSerif", Font.PLAIN, 10));
-    chart.addAnnotation(entryAnnotation);
-
-    String exitLabel =
-        "❌ "
-            + LABEL_TIME_FORMAT.format(trade.exitTime())
-            + "\nPrecio: "
-            + formatPrice(trade.exitPrice())
-            + "\nSeñales: "
-            + summarizeSignals(trade.exitSignals())
-            + "\nMotivo: "
-            + safeText(trade.exitReason())
-            + "\nPnL: "
-            + formatPrice(trade.pnl());
-    XYTextAnnotation exitAnnotation =
-        new XYTextAnnotation(
-            exitLabel, Date.from(trade.exitTime()).getTime(), trade.exitPrice().doubleValue());
-    exitAnnotation.setFont(new Font("SansSerif", Font.PLAIN, 10));
-    chart.addAnnotation(exitAnnotation);
-  }
-
-  private void annotateMetrics(
-      OHLCChart chart,
-      MetricsSummary metrics,
-      List<Kline> klines,
-      List<Double> highs) {
-    if (metrics == null) {
-      return;
+    if (!entryTimes.isEmpty()) {
+      XYSeries entries = chart.addSeries("Entradas", entryTimes, entryPrices);
+      entries.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
+      entries.setMarker(SeriesMarkers.CIRCLE);
+      entries.setMarkerColor(new Color(39, 174, 96));
+      entries.setLineStyle(SeriesLines.NONE);
     }
-    StringJoiner joiner = new StringJoiner("  |  ");
-    joiner.add("WinRate: " + percent(metrics.winRate()));
-    joiner.add("ProfitFactor: " + decimal(metrics.profitFactor()));
-    joiner.add("MaxDD: " + percent(metrics.maxDrawdown()));
-    joiner.add("Sharpe: " + decimal(metrics.sharpe()));
-    joiner.add("Sortino: " + decimal(metrics.sortino()));
-    joiner.add("Trades: " + metrics.trades());
-    double top = highs.stream().mapToDouble(Double::doubleValue).max().orElse(0);
-    if (!klines.isEmpty()) {
-      XYTextAnnotation annotation =
-          new XYTextAnnotation(
-              joiner.toString(), Date.from(klines.get(0).openTime()).getTime(), top * 1.01);
-      annotation.setFont(new Font("SansSerif", Font.BOLD, 11));
-      chart.addAnnotation(annotation);
+
+    if (!exitTimes.isEmpty()) {
+      XYSeries exits = chart.addSeries("Salidas", exitTimes, exitPrices);
+      exits.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
+      exits.setMarker(SeriesMarkers.DIAMOND);
+      exits.setMarkerColor(new Color(192, 57, 43));
+      exits.setLineStyle(SeriesLines.NONE);
     }
   }
 

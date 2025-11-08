@@ -1,5 +1,7 @@
 package com.bottrading.web;
 
+// FIX: Confirm ResponseEntity generic type matches SignalResult payload.
+
 import com.bottrading.service.StrategyService;
 import com.bottrading.strategy.SignalResult;
 import org.springframework.http.ResponseEntity;

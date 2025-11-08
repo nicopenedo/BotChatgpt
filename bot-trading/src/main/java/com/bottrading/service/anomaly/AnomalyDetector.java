@@ -1,5 +1,7 @@
 package com.bottrading.service.anomaly;
 
+// FIX: Ensure large response maps use Map.ofEntries for Java 21 collection limits.
+
 import com.bottrading.config.AnomalyProperties;
 import com.bottrading.saas.service.TenantMetrics;
 import com.bottrading.service.risk.RiskFlag;

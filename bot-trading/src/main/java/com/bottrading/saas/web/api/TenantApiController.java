@@ -1,5 +1,7 @@
 package com.bottrading.saas.web.api;
 
+// FIX: Tighten ResponseEntity generics to avoid wildcard capture issues on Java 21.
+
 import com.bottrading.saas.model.dto.ApiKeyRequest;
 import com.bottrading.saas.model.dto.SignupRequest;
 import com.bottrading.saas.model.dto.TenantStatusResponse;
@@ -96,7 +98,8 @@ public class TenantApiController {
   }
 
   @PostMapping("/tenant/api-keys")
-  public ResponseEntity<?> createApiKey(@Valid @RequestBody ApiKeyRequest request) {
+  public ResponseEntity<Map<String, Object>> createApiKey(
+      @Valid @RequestBody ApiKeyRequest request) {
     TenantUserDetails principal = currentUser();
     tenantSecurityService.storeApiKey(principal.getTenantId(), principal.getId(), request);
     return ResponseEntity.ok(Map.of("status", "stored"));
