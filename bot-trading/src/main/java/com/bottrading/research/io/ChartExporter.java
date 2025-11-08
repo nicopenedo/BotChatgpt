@@ -4,7 +4,6 @@ import com.bottrading.model.dto.Kline;
 import com.bottrading.research.backtest.EquityPoint;
 import com.bottrading.research.backtest.MetricsSummary;
 import com.bottrading.research.backtest.TradeRecord;
-import com.bottrading.strategy.SignalSide;
 import java.awt.Color;
 import java.awt.Font;
 import java.io.IOException;
@@ -26,11 +25,9 @@ import org.knowm.xchart.OHLCChartBuilder;
 import org.knowm.xchart.XYChart;
 import org.knowm.xchart.XYChartBuilder;
 import org.knowm.xchart.XYSeries;
-import org.knowm.xchart.XYSeries.XYSeriesRenderStyle;
 import org.knowm.xchart.annotations.XYTextAnnotation;
 import org.knowm.xchart.internal.chartpart.Chart;
 import org.knowm.xchart.style.Styler.LegendPosition;
-import org.knowm.xchart.style.markers.SeriesMarkers;
 
 public class ChartExporter {
 
@@ -113,72 +110,8 @@ public class ChartExporter {
     if (trades == null || trades.isEmpty()) {
       return;
     }
-    List<Date> buyWinsX = new ArrayList<>();
-    List<Double> buyWinsY = new ArrayList<>();
-    List<Date> buyLossX = new ArrayList<>();
-    List<Double> buyLossY = new ArrayList<>();
-    List<Date> sellWinsX = new ArrayList<>();
-    List<Double> sellWinsY = new ArrayList<>();
-    List<Date> sellLossX = new ArrayList<>();
-    List<Double> sellLossY = new ArrayList<>();
-    List<Date> exitsX = new ArrayList<>();
-    List<Double> exitsY = new ArrayList<>();
-
     for (TradeRecord trade : trades) {
-      Date entryDate = Date.from(trade.entryTime());
-      double entryPrice = trade.entryPrice().doubleValue();
-      boolean win = trade.win();
-      if (trade.side() == SignalSide.SELL) {
-        if (win) {
-          sellWinsX.add(entryDate);
-          sellWinsY.add(entryPrice);
-        } else {
-          sellLossX.add(entryDate);
-          sellLossY.add(entryPrice);
-        }
-      } else {
-        if (win) {
-          buyWinsX.add(entryDate);
-          buyWinsY.add(entryPrice);
-        } else {
-          buyLossX.add(entryDate);
-          buyLossY.add(entryPrice);
-        }
-      }
-      exitsX.add(Date.from(trade.exitTime()));
-      exitsY.add(trade.exitPrice().doubleValue());
       addTradeAnnotation(chart, trade);
-    }
-
-    if (!buyWinsX.isEmpty()) {
-      XYSeries series = chart.addSeries("BUY ✅", buyWinsX, buyWinsY);
-      series.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
-      series.setMarker(SeriesMarkers.CIRCLE);
-      series.setMarkerColor(new Color(46, 204, 113));
-    }
-    if (!buyLossX.isEmpty()) {
-      XYSeries series = chart.addSeries("BUY ❌", buyLossX, buyLossY);
-      series.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
-      series.setMarker(SeriesMarkers.CROSS);
-      series.setMarkerColor(new Color(231, 76, 60));
-    }
-    if (!sellWinsX.isEmpty()) {
-      XYSeries series = chart.addSeries("SELL ✅", sellWinsX, sellWinsY);
-      series.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
-      series.setMarker(SeriesMarkers.CIRCLE);
-      series.setMarkerColor(new Color(52, 152, 219));
-    }
-    if (!sellLossX.isEmpty()) {
-      XYSeries series = chart.addSeries("SELL ❌", sellLossX, sellLossY);
-      series.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
-      series.setMarker(SeriesMarkers.CROSS);
-      series.setMarkerColor(new Color(142, 68, 173));
-    }
-    if (!exitsX.isEmpty()) {
-      XYSeries series = chart.addSeries("Salidas", exitsX, exitsY);
-      series.setXYSeriesRenderStyle(XYSeriesRenderStyle.Scatter);
-      series.setMarker(SeriesMarkers.DIAMOND);
-      series.setMarkerColor(new Color(44, 62, 80));
     }
   }
 

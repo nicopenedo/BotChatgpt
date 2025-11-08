@@ -297,6 +297,14 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
     private static ForwardedHeaderResult none() {
       return new ForwardedHeaderResult(Optional.empty(), false);
     }
+
+    public Optional<String> clientIp() {
+      return clientIp;
+    }
+
+    public boolean invalid() {
+      return invalid;
+    }
   }
 
   private void reject(HttpServletResponse response, HttpStatus status) throws IOException {

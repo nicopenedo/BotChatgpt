@@ -10,9 +10,9 @@ public class RateLimitingConfig {
 
   @Bean
   public FilterRegistrationBean<RateLimitingFilter> rateLimitingFilterRegistration(
-      TradingProps properties) {
+      RateLimitingFilter filter) {
     FilterRegistrationBean<RateLimitingFilter> registration = new FilterRegistrationBean<>();
-    registration.setFilter(new RateLimitingFilter(properties));
+    registration.setFilter(filter);
     registration.addUrlPatterns("/api/trade/*");
     registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 20);
     return registration;

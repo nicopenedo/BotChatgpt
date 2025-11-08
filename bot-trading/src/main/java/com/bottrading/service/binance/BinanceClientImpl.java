@@ -92,7 +92,7 @@ public class BinanceClientImpl implements BinanceClient {
         execute(
             Endpoint.PRICE_TICKER,
             symbol,
-            () -> spotClient.createMarket().tickerPrice(Map.of("symbol", symbol)));
+            () -> spotClient.createMarket().tickerSymbol(Map.of("symbol", symbol)));
     JsonNode node = readTree(response);
     return new PriceTicker(symbol, new BigDecimal(node.get("price").asText()));
   }
@@ -193,7 +193,7 @@ public class BinanceClientImpl implements BinanceClient {
     Map<String, Object> params = new HashMap<>();
     params.put("symbol", symbol);
     String response =
-        execute(Endpoint.COMMISSION, symbol, () -> spotClient.createTrade().commissionRate(params));
+        execute(Endpoint.COMMISSION, symbol, () -> spotClient.createTrade().commission(params));
     JsonNode node = readTree(response);
     BigDecimal maker = new BigDecimal(node.get("makerCommission").asText());
     cache.put(symbol, maker);

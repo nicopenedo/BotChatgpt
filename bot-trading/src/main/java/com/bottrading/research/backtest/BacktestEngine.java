@@ -10,6 +10,7 @@ import com.bottrading.strategy.SignalResult;
 import com.bottrading.strategy.SignalSide;
 import com.bottrading.strategy.StrategyContext;
 import com.bottrading.strategy.StrategyFactory;
+import com.bottrading.strategy.StrategyFactory.StrategyCatalog;
 import com.bottrading.research.io.DataLoader;
 import com.bottrading.research.regime.RegimeFilter;
 import java.io.IOException;
@@ -175,6 +176,7 @@ public class BacktestEngine {
     if (request.strategyConfig() != null) {
       return strategyFactory
           .buildFromPath(request.strategyConfig())
+          .map(catalog -> catalog.strategy(catalog.defaultPreset()))
           .orElseGet(() -> strategyFactory.getStrategy());
     }
     return strategyFactory.getStrategy();

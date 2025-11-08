@@ -505,29 +505,18 @@ public class AnomalyDetector {
       String cause,
       List<Double> sparkline) {
     public Map<String, Object> asMap() {
-      return Map.of(
-          "symbol",
-          symbol,
-          "metric",
-          metric,
-          "severity",
-          severity,
-          "action",
-          action,
-          "value",
-          value,
-          "zScore",
-          zScore,
-          "triggeredAt",
-          triggeredAt,
-          "expiresAt",
-          expiresAt,
-          "cause",
-          cause,
-          "sparkline",
-          sparkline,
-          "active",
-          true);
+      return Map.ofEntries(
+          Map.entry("symbol", symbol),
+          Map.entry("metric", metric),
+          Map.entry("severity", severity),
+          Map.entry("action", action),
+          Map.entry("value", value),
+          Map.entry("zScore", zScore),
+          Map.entry("triggeredAt", triggeredAt),
+          Map.entry("expiresAt", expiresAt),
+          Map.entry("cause", cause),
+          Map.entry("sparkline", sparkline),
+          Map.entry("active", true));
     }
   }
 }
