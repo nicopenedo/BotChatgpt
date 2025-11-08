@@ -271,7 +271,7 @@ public class TradingScheduler {
         return;
       }
       lastCloseTimes.computeIfAbsent(symbol, s -> new AtomicLong(-1)).set(closeTime);
-      Timer.Sample sample = Timer.start(clock);
+      Timer.Sample sample = Timer.start(meterRegistry);
       try {
         StrategyDecision decision = strategyService.decide(symbol);
         DecisionContext context = new DecisionContext(decisionKey, symbol, interval, closeTime, now, source);

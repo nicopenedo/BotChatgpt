@@ -108,7 +108,7 @@ public class ResearchNightlyPipeline {
       return;
     }
     Instant runStart = Instant.now(clock);
-    Timer.Sample totalSample = Timer.start(clock);
+    Timer.Sample totalSample = Timer.start(meterRegistry);
     try {
       executeNightly(nightly);
     } catch (Exception ex) {
@@ -130,11 +130,11 @@ public class ResearchNightlyPipeline {
     log.info("Nightly research start symbol={} interval={} from={} to={}", symbol, interval, from, to);
     incrementNightlyRuns(symbol, interval);
 
-    Timer.Sample loadSample = Timer.start(clock);
+    Timer.Sample loadSample = Timer.start(meterRegistry);
     List<com.bottrading.model.dto.Kline> klines =
         dataLoader.load(symbol, interval, from, to, dataset.isUseCache());
     loadSample.stop(stageTimer("load_data"));
-    Timer.Sample labelSample = Timer.start(clock);
+    Timer.Sample labelSample = Timer.start(meterRegistry);
     List<RegimeLabel> labels = regimeLabeler.label(symbol, interval, klines);
     labelSample.stop(stageTimer("label_regime"));
     RegimeLabelSet labelSet = new RegimeLabelSet(labels);
@@ -156,7 +156,7 @@ public class ResearchNightlyPipeline {
       }
     }
 
-    Timer.Sample canaryEval = Timer.start(clock);
+    Timer.Sample canaryEval = Timer.start(meterRegistry);
     var updates = canaryStageService.evaluatePending(nightly);
     canaryEval.stop(stageTimer("canary_eval"));
     for (CanaryStageService.StageUpdate update : updates) {
@@ -213,7 +213,7 @@ public class ResearchNightlyPipeline {
             filter,
             null);
 
-    Timer.Sample splitSample = Timer.start(clock);
+    Timer.Sample splitSample = Timer.start(meterRegistry);
     List<BacktestRequest> windows =
         WalkForwardOptimizer.splitByRegime(
             baseRequest,
@@ -232,7 +232,7 @@ public class ResearchNightlyPipeline {
     List<WindowMetrics> windowMetrics = new ArrayList<>();
     Map<String, Object> perSplitMetrics = new LinkedHashMap<>();
 
-    Timer.Sample gaSample = Timer.start(clock);
+    Timer.Sample gaSample = Timer.start(meterRegistry);
     for (BacktestRequest window : windows) {
       Evaluator evaluator =
           new Evaluator(
@@ -259,13 +259,13 @@ public class ResearchNightlyPipeline {
       return;
     }
 
-    Timer.Sample oosSample = Timer.start(clock);
+    Timer.Sample oosSample = Timer.start(meterRegistry);
     BacktestResult result = backtestEngine.run(baseRequest, regimeDir, champion.toStrategy());
     oosSample.stop(stageTimer("backtest_oos"));
     reportWriter.write(regimeDir, result);
     Map<String, Object> oosMetrics = toMetricsMap(result.metrics());
 
-    Timer.Sample gateSample = Timer.start(clock);
+    Timer.Sample gateSample = Timer.start(meterRegistry);
     PromotionGate.GateDecision gateDecision =
         PromotionGate.evaluateOos(result.metrics(), gate, gate.getPfBaseline());
     gateSample.stop(stageTimer("gate_evaluation"));
@@ -274,7 +274,7 @@ public class ResearchNightlyPipeline {
     String status = gateDecision.approved() ? "eligible" : "rejected";
     String note = gateDecision.approved() ? "" : gateDecision.reason();
 
-    Timer.Sample reportSample = Timer.start(clock);
+    Timer.Sample reportSample = Timer.start(meterRegistry);
     ReportData reportData =
         new ReportData(runId, symbol, trend, status, note, oosMetrics, shadowMetrics, windowMetrics, regimeDir);
     reportGenerator.generate(reportData);
@@ -321,16 +321,16 @@ public class ResearchNightlyPipeline {
             result.dataHash(),
             labelsHash);
 
-    Timer.Sample importSample = Timer.start(clock);
+    Timer.Sample importSample = Timer.start(meterRegistry);
     PresetVersion preset = presetService.importPreset(request);
     importSample.stop(stageTimer("preset_import"));
-    Timer.Sample snapshotSample = Timer.start(clock);
+    Timer.Sample snapshotSample = Timer.start(meterRegistry);
     snapshotService.createSnapshot(
         preset.getId(), SnapshotWindow.CUSTOM, oosMetrics, Map.of(), Map.of());
     snapshotSample.stop(stageTimer("snapshot"));
     MetricsSummary metrics = result.metrics();
     double pf = metrics.profitFactor() != null ? metrics.profitFactor().doubleValue() : 0.0d;
-    Timer.Sample canaryInit = Timer.start(clock);
+    Timer.Sample canaryInit = Timer.start(meterRegistry);
     canaryStageService.initializeState(preset, symbol, runId, pf, metrics.trades());
     canaryInit.stop(stageTimer("canary_init"));
     notify(

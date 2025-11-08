@@ -161,15 +161,15 @@ public class LeaderboardService {
       return new MetricsSnapshot(Map.of(), "", null);
     }
 
-    Map<String, Object> metrics() {
+    public Map<String, Object> metrics() {
       return metrics;
     }
 
-    String window() {
+    public String window() {
       return window;
     }
 
-    Instant timestamp() {
+    public Instant timestamp() {
       return timestamp;
     }
   }

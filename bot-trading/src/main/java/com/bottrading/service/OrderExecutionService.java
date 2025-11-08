@@ -149,12 +149,6 @@ public class OrderExecutionService {
       log.info("VAR guard blocked {} reasons={}", decisionKey, varAssessment.reasons());
       return Optional.empty();
     }
-    OrderRequest request = new OrderRequest();
-    request.setSymbol(symbol);
-    request.setSide(orderSide);
-    request.setDryRun(tradingProps.isDryRun());
-    request.setClientOrderId(newClientOrderId(symbol, interval, closeTime));
-
     BigDecimal quantity = varAssessment.adjustedQuantity();
     if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
       log.info("VAR adjusted quantity to zero for {}", decisionKey);

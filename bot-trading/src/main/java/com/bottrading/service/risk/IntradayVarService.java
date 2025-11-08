@@ -782,15 +782,15 @@ public class IntradayVarService {
       return new Stats(true, varR, cvarR);
     }
 
-    boolean valid() {
+    public boolean valid() {
       return valid;
     }
 
-    double varR() {
+    public double varR() {
       return varR;
     }
 
-    double cvarR() {
+    public double cvarR() {
       return cvarR;
     }
   }

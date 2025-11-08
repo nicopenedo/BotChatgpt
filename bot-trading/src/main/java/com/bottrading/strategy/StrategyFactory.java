@@ -120,13 +120,15 @@ public class StrategyFactory {
       log.warn("Strategy configuration empty or invalid, falling back to defaults");
       return Optional.empty();
     }
-    Map<String, Object> baseSections = extractBaseSections(rootMap);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> typedRoot = (Map<String, Object>) rootMap;
+    Map<String, Object> baseSections = extractBaseSections(typedRoot);
     CompositeStrategy defaultStrategy = buildComposite(baseSections);
 
     Map<String, CompositeStrategy> presets = new HashMap<>();
     presets.put("default", defaultStrategy);
 
-    Map<String, Object> presetConfigs = castMap(rootMap.get("presets"));
+    Map<String, Object> presetConfigs = castMap(typedRoot.get("presets"));
     if (presetConfigs != null) {
       for (Map.Entry<String, Object> entry : presetConfigs.entrySet()) {
         Map<String, Object> presetMap = castMap(entry.getValue());
@@ -146,7 +148,7 @@ public class StrategyFactory {
       }
     }
 
-    RouterConfig routerConfig = parseRouterConfig(rootMap.get("router"));
+    RouterConfig routerConfig = parseRouterConfig(typedRoot.get("router"));
     return Optional.of(new StrategyCatalog(presets, routerConfig, "default"));
   }
 
