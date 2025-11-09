@@ -26,8 +26,19 @@ class TotpServiceTest {
     SecretKey decoded = service.fromBase32(encoded);
     assertThat(decoded).isNotNull();
 
+    assertThat(service.toBase32(decoded)).isEqualTo(encoded);
+
     String currentCode = currentTotpCode(decoded);
     assertThat(service.verify(decoded, currentCode)).isTrue();
+  }
+
+  @Test
+  void verifiesKnownBase32Secret() throws Exception {
+    SecretKey key = service.fromBase32("JBSWY3DPEHPK3PXP");
+    assertThat(key).isNotNull();
+
+    String code = currentTotpCode(key);
+    assertThat(service.verify(key, code)).isTrue();
   }
 
   @Test

@@ -276,6 +276,9 @@ public class TradingScheduler {
       Timer.Sample sample = Timer.start(meterRegistry);
       try {
         StrategyDecision decision = strategyService.decide(symbol);
+        DecisionContext context =
+            new DecisionContext(decisionKey, symbol, interval, closeTime, now, source);
+        handleDecision(context, decision);
       } finally {
         sample.stop(decisionTimer);
       }
