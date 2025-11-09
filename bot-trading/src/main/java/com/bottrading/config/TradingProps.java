@@ -26,6 +26,7 @@ public class TradingProps {
   private BigDecimal riskPerTradePct = BigDecimal.valueOf(0.25);
   private int cooldownMinutes = 60;
   private int maxOrdersPerMinute = 5;
+  private int rateLimitRps = 10;
   private BigDecimal minVolume24h = BigDecimal.valueOf(1000);
   private boolean dryRun = true;
   private String tradingHours = "00:00-23:59";
@@ -111,6 +112,14 @@ public class TradingProps {
 
   public void setMaxOrdersPerMinute(int maxOrdersPerMinute) {
     this.maxOrdersPerMinute = maxOrdersPerMinute;
+  }
+
+  public int getRateLimitRps() {
+    return rateLimitRps;
+  }
+
+  public void setRateLimitRps(int rateLimitRps) {
+    this.rateLimitRps = rateLimitRps;
   }
 
   public BigDecimal getMinVolume24h() {
