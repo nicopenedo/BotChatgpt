@@ -1,5 +1,7 @@
 package com.bottrading.config;
 
+// FIX: Bucket4j 8.x import updates and greedy refill configuration.
+
 import com.bottrading.saas.security.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,53 +12,47 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
+import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.Refill;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component // o registrarlo como @Bean en una @Configuration
+@Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
   private final TradingProps properties;
   private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
   private final Bandwidth limit;
-  private final Duration refillPeriod;
 
   public RateLimitingFilter(TradingProps properties) {
     this.properties = properties;
-    int rps = Math.max(1, properties.getRateLimitRps());
-    this.refillPeriod = Duration.ofSeconds(1);
-    this.limit = Bandwidth.classic(rps, Refill.greedy(rps, refillPeriod));
+    int capacity = Math.max(1, properties.getMaxOrdersPerMinute());
+    this.limit = Bandwidth.classic(capacity, Refill.greedy(capacity, Duration.ofMinutes(1)));
   }
 
   @Override
   protected void doFilterInternal(
-          HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-          throws ServletException, IOException {
-
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
     if (!properties.isLiveEnabled()) {
       filterChain.doFilter(request, response);
       return;
     }
 
     Bucket bucket = resolveBucket(resolveKey(request));
-    boolean allowed = bucket.tryConsume(1);
-    long remaining = Math.max(0, bucket.getAvailableTokens());
+    ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+    long remaining = Math.max(0, probe.getRemainingTokens());
     response.setHeader("X-Rate-Limit-Remaining", Long.toString(remaining));
-
-    if (allowed) {
+    if (probe.isConsumed()) {
       filterChain.doFilter(request, response);
       return;
     }
-
-    long retryAfterSeconds = Math.max(1, refillPeriod.getSeconds());
-    response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
+    long waitForRefill = probe.getNanosToWaitForRefill();
+    response.setHeader("Retry-After", String.valueOf(Duration.ofNanos(waitForRefill).toSeconds()));
     response.sendError(HttpStatus.TOO_MANY_REQUESTS.value(), "Too Many Requests");
   }
 
