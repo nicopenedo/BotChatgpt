@@ -162,43 +162,45 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
     }
 
     ForwardedHeaderResult forwardedCandidate = resolveFromForwardedHeaders(request);
-    if (forwardedCandidate.invalid()) { // accessor implícito del record
-      return Optional.empty();
-    }
-    if (forwardedCandidate.clientIp().isPresent()) { // accessor implícito del record
+    if (forwardedCandidate.trusted() && forwardedCandidate.clientIp().isPresent()) {
       return forwardedCandidate.clientIp();
     }
-
+    if (forwardedCandidate.invalid()) {
+      return Optional.empty();
+    }
     return Optional.of(remoteAddr);
   }
 
   private ForwardedHeaderResult resolveFromForwardedHeaders(HttpServletRequest request) {
     String header = request.getHeader(X_FORWARDED_FOR);
+    boolean headerSeen = false;
     if (StringUtils.hasText(header)) {
+      headerSeen = true;
       String[] parts = header.split(",");
       for (String part : parts) {
         String candidate = part.trim();
         if (!isValidIp(candidate)) {
-          return ForwardedHeaderResult.invalidResult();
+          return ForwardedHeaderResult.invalid("x-forwarded-for");
         }
         if (!matches(candidate, trustedProxyMatchers)) {
-          return ForwardedHeaderResult.resolvedResult(candidate);
+          return ForwardedHeaderResult.trusted(candidate, "x-forwarded-for");
         }
       }
     }
 
     String realIp = request.getHeader(X_REAL_IP);
     if (StringUtils.hasText(realIp)) {
+      headerSeen = true;
       String candidate = realIp.trim();
       if (!isValidIp(candidate)) {
-        return ForwardedHeaderResult.invalidResult();
+        return ForwardedHeaderResult.invalid("x-real-ip");
       }
       if (!matches(candidate, trustedProxyMatchers)) {
-        return ForwardedHeaderResult.resolvedResult(candidate);
+        return ForwardedHeaderResult.trusted(candidate, "x-real-ip");
       }
     }
 
-    return ForwardedHeaderResult.noneResult();
+    return ForwardedHeaderResult.none(headerSeen ? "forwarded" : "none");
   }
 
   private boolean matches(String candidate, List<IpAddressMatcher> matchers) {
@@ -288,19 +290,22 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
   }
 
   // === Record: usar nombres de factories distintos a los accessors implícitos ===
-  private record ForwardedHeaderResult(Optional<String> clientIp, boolean invalid) {
-    public static ForwardedHeaderResult resolvedResult(String ip) {
-      return new ForwardedHeaderResult(Optional.of(ip), false);
+  private record ForwardedHeaderResult(boolean trusted, Optional<String> clientIp, String source) {
+    public static ForwardedHeaderResult trusted(String ip, String source) {
+      return new ForwardedHeaderResult(true, Optional.ofNullable(ip), source);
     }
 
-    public static ForwardedHeaderResult invalidResult() {
-      return new ForwardedHeaderResult(Optional.empty(), true);
+    public static ForwardedHeaderResult invalid(String source) {
+      return new ForwardedHeaderResult(false, Optional.empty(), "invalid:" + source);
     }
 
-    public static ForwardedHeaderResult noneResult() {
-      return new ForwardedHeaderResult(Optional.empty(), false);
+    public static ForwardedHeaderResult none(String source) {
+      return new ForwardedHeaderResult(false, Optional.empty(), source);
     }
-    // No redefinir clientIp() ni invalid(): los genera el record.
+
+    public boolean invalid() {
+      return source != null && source.startsWith("invalid:");
+    }
   }
 
   private void reject(HttpServletResponse response, HttpStatus status) throws IOException {
