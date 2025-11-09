@@ -135,12 +135,12 @@
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli-spring-boot-starter</artifactId>
-            <version>4.7.5</version>
+            <version>4.7.6</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
-            <version>4.7.5</version>
+            <version>4.7.6</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
