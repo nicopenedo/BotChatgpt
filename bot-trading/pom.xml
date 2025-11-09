@@ -84,9 +84,9 @@
             <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.bucket4j</groupId>
+            <groupId>com.github.vladimir-bukhtoyarov</groupId>
             <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
+            <version>7.4.0</version>
         </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
@@ -135,12 +135,12 @@
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli-spring-boot-starter</artifactId>
-            <version>4.7.5</version>
+            <version>4.7.6</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
-            <version>4.7.5</version>
+            <version>4.7.6</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>

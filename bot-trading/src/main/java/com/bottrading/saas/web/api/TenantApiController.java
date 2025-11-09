@@ -63,19 +63,19 @@ public class TenantApiController {
   private final SaasProperties properties;
 
   public TenantApiController(
-      TenantSecurityService tenantSecurityService,
-      TenantStatusService tenantStatusService,
-      TenantNotificationService notificationService,
-      TenantReportService tenantReportService,
-      AuditEventRepository auditEventRepository,
-      LimitsGuardService limitsGuardService,
-      ShadowPromoterService shadowPromoterService,
-      OnboardingService onboardingService,
-      BillingService billingService,
-      TenantAccountService tenantAccountService,
-      ConsentService consentService,
-      TenantDataExportService tenantDataExportService,
-      SaasProperties properties) {
+          TenantSecurityService tenantSecurityService,
+          TenantStatusService tenantStatusService,
+          TenantNotificationService notificationService,
+          TenantReportService tenantReportService,
+          AuditEventRepository auditEventRepository,
+          LimitsGuardService limitsGuardService,
+          ShadowPromoterService shadowPromoterService,
+          OnboardingService onboardingService,
+          BillingService billingService,
+          TenantAccountService tenantAccountService,
+          ConsentService consentService,
+          TenantDataExportService tenantDataExportService,
+          SaasProperties properties) {
     this.tenantSecurityService = tenantSecurityService;
     this.tenantStatusService = tenantStatusService;
     this.notificationService = notificationService;
@@ -94,35 +94,35 @@ public class TenantApiController {
   @PostMapping("/signup")
   public ResponseEntity<Map<String, Object>> signup(@Valid @RequestBody SignupRequest request) {
     UUID tenantId = onboardingService.signup(request);
-    return ResponseEntity.ok(Map.of("tenantId", tenantId));
+    return ResponseEntity.ok(Map.<String, Object>of("tenantId", tenantId));
   }
 
   @PostMapping("/tenant/api-keys")
   public ResponseEntity<Map<String, Object>> createApiKey(
-      @Valid @RequestBody ApiKeyRequest request) {
+          @Valid @RequestBody ApiKeyRequest request) {
     TenantUserDetails principal = currentUser();
     tenantSecurityService.storeApiKey(principal.getTenantId(), principal.getId(), request);
-    return ResponseEntity.ok(Map.of("status", "stored"));
+    return ResponseEntity.ok(Map.<String, Object>of("status", "stored"));
   }
 
   @GetMapping("/tenant/status")
   public ResponseEntity<TenantStatusResponse> status() {
     return tenantStatusService
-        .getStatus(currentTenant())
-        .map(ResponseEntity::ok)
-        .orElse(ResponseEntity.notFound().build());
+            .getStatus(currentTenant())
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
   }
 
   @PostMapping("/bots/{botId}/mode/{mode}")
   public ResponseEntity<Map<String, Object>> changeBotMode(
-      @PathVariable("botId") String botId,
-      @PathVariable("mode") String mode,
-      @RequestBody(required = false) Map<String, Object> payload,
-      @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
+          @PathVariable("botId") String botId,
+          @PathVariable("mode") String mode,
+          @RequestBody(required = false) Map<String, Object> payload,
+          @RequestHeader(value = "X-Forwarded-For", required = false) String ip) {
     UUID tenantId = currentTenant();
     if (tenantAccountService.isTradingPaused(tenantId) && "LIVE".equalsIgnoreCase(mode)) {
       return ResponseEntity.status(HttpStatus.CONFLICT)
-          .body(Map.of("error", "Trading paused for tenant"));
+              .body(Map.<String, Object>of("error", "Trading paused for tenant"));
     }
     if ("LIVE".equalsIgnoreCase(mode)) {
       if (!consentService.hasCurrentConsent(tenantId)) {
@@ -131,39 +131,44 @@ public class TenantApiController {
           if (consent instanceof Map<?, ?> consentMap) {
             String terms = toString(consentMap.get("termsVersionHash"));
             String risk = toString(consentMap.get("riskVersionHash"));
-            Boolean accepted = Boolean.valueOf(String.valueOf(consentMap.getOrDefault("accepted", false)));
+            Object acceptedRaw = consentMap.get("accepted");
+            Boolean accepted = (acceptedRaw instanceof Boolean b)
+                    ? b
+                    : Boolean.valueOf(String.valueOf(acceptedRaw));
             if (Boolean.TRUE.equals(accepted)) {
               TenantUserDetails user = currentUser();
+              String ua = java.util.Optional.ofNullable(consentMap.get("ua"))
+                      .map(String::valueOf)
+                      .orElse("api");
               consentService.recordConsent(
-                  tenantId,
-                  user.getId(),
-                  terms != null ? terms : properties.getLegal().getTermsVersion(),
-                  risk != null ? risk : properties.getLegal().getRiskVersion(),
-                  ip,
-                  String.valueOf(consentMap.getOrDefault("ua", "api")));
+                      tenantId,
+                      user.getId(),
+                      terms != null ? terms : properties.getLegal().getTermsVersion(),
+                      risk != null ? risk : properties.getLegal().getRiskVersion(),
+                      ip,ua);
             } else {
               return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-                  .body(
-                      Map.of(
-                          "error", "Consent required",
-                          "termsVersion", properties.getLegal().getTermsVersion(),
-                          "riskVersion", properties.getLegal().getRiskVersion()));
+                      .body(
+                              Map.<String, Object>of(
+                                      "error", "Consent required",
+                                      "termsVersion", properties.getLegal().getTermsVersion(),
+                                      "riskVersion", properties.getLegal().getRiskVersion()));
             }
           } else {
             return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-                .body(
-                    Map.of(
-                        "error", "Consent details missing",
-                        "termsVersion", properties.getLegal().getTermsVersion(),
-                        "riskVersion", properties.getLegal().getRiskVersion()));
+                    .body(
+                            Map.<String, Object>of(
+                                    "error", "Consent details missing",
+                                    "termsVersion", properties.getLegal().getTermsVersion(),
+                                    "riskVersion", properties.getLegal().getRiskVersion()));
           }
         } else {
           return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-              .body(
-                  Map.of(
-                      "error", "Consent required",
-                      "termsVersion", properties.getLegal().getTermsVersion(),
-                      "riskVersion", properties.getLegal().getRiskVersion()));
+                  .body(
+                          Map.<String, Object>of(
+                                  "error", "Consent required",
+                                  "termsVersion", properties.getLegal().getTermsVersion(),
+                                  "riskVersion", properties.getLegal().getRiskVersion()));
         }
       }
     }
@@ -171,95 +176,86 @@ public class TenantApiController {
       Object kpiObj = payload.get("kpis");
       if (kpiObj instanceof Map<?, ?> map) {
         boolean promote =
-            shadowPromoterService.shouldPromote(
-                map.entrySet().stream()
-                    .filter(e -> e.getValue() instanceof Number)
-                    .collect(
-                        java.util.stream.Collectors.toMap(
-                            e -> e.getKey().toString(),
-                            e -> new BigDecimal(e.getValue().toString()))));
+                shadowPromoterService.shouldPromote(
+                        map.entrySet().stream()
+                                .filter(e -> e.getValue() instanceof Number)
+                                .collect(
+                                        java.util.stream.Collectors.toMap(
+                                                e -> e.getKey().toString(),
+                                                e -> new BigDecimal(e.getValue().toString()))));
         if (!promote) {
-          return ResponseEntity.badRequest().body(Map.of("error", "Shadow KPIs below thresholds"));
+          return ResponseEntity.badRequest().body(Map.<String, Object>of("error", "Shadow KPIs below thresholds"));
         }
       }
     }
     notificationService.notify(tenantId, "mode-change", "Bot " + botId + " → " + mode);
-    return ResponseEntity.ok(Map.of("botId", botId, "mode", mode));
+    return ResponseEntity.ok(Map.<String, Object>of("botId", botId, "mode", mode));
   }
 
   @PostMapping("/bots/{botId}/limits")
   public ResponseEntity<Map<String, Object>> updateBotLimits(
-      @PathVariable("botId") String botId, @RequestBody Map<String, Object> limits) {
+          @PathVariable("botId") String botId, @RequestBody Map<String, Object> limits) {
     Object canaryValue = limits.get("canaryShare");
     if (canaryValue instanceof Number number) {
       boolean ok = limitsGuardService.withinCanary(currentTenant(), BigDecimal.valueOf(number.doubleValue()));
       if (!ok) {
-        return ResponseEntity.badRequest().body(Map.of("error", "Canary share exceeds plan limits"));
+        return ResponseEntity.badRequest().body(Map.<String, Object>of("error", "Canary share exceeds plan limits"));
       }
     }
     notificationService.notify(currentTenant(), "limits", "Updated limits for " + botId);
-    return ResponseEntity.ok(Map.of("botId", botId, "limits", limits));
+    return ResponseEntity.ok(Map.<String, Object>of("botId", botId, "limits", limits));
   }
 
   @GetMapping("/pnl/attribution")
   public ResponseEntity<List<Map<String, Object>>> pnlAttribution(
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
     List<Map<String, Object>> data =
-        List.of(
-            Map.of(
-                "bucket",
-                "signal",
-                "pnl",
-                BigDecimal.ZERO,
-                "fees",
-                BigDecimal.ZERO,
-                "trades",
-                0));
+            List.of(
+                    Map.<String, Object>of(
+                            "bucket", "signal",
+                            "pnl", BigDecimal.ZERO,
+                            "fees", BigDecimal.ZERO,
+                            "trades", 0));
     return ResponseEntity.ok(data);
   }
 
   @GetMapping("/bandit/stats")
   public ResponseEntity<Map<String, Object>> banditStats(
-      @RequestParam String symbol, @RequestParam(required = false) String regime) {
+          @RequestParam String symbol, @RequestParam(required = false) String regime) {
     Map<String, Object> stats =
-        Map.of(
-            "symbol",
-            symbol,
-            "regime",
-            regime,
-            "pulls",
-            0,
-            "reward",
-            BigDecimal.ZERO,
-            "canaryShare",
-            BigDecimal.ZERO);
+            Map.<String, Object>of(
+                    "symbol", symbol,
+                    "regime", regime,
+                    "pulls", 0,
+                    "reward", BigDecimal.ZERO,
+                    "canaryShare", BigDecimal.ZERO);
     return ResponseEntity.ok(stats);
   }
 
   @GetMapping("/reports/monthly")
   public ResponseEntity<Map<String, Object>> monthlyReport(@RequestParam("yyyymm") String yyyymm)
-      throws Exception {
+          throws Exception {
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
     YearMonth month = YearMonth.parse(yyyymm, formatter);
     var path = tenantReportService.generateMonthlyReport(currentTenant(), month);
-    return ResponseEntity.ok(Map.of("path", path.toString()));
+    return ResponseEntity.ok(Map.<String, Object>of("path", path.toString()));
   }
 
   @PostMapping("/notifications/test")
   public ResponseEntity<Map<String, Object>> sendTestNotification(@RequestBody Map<String, String> body) {
     notificationService.notify(currentTenant(), body.getOrDefault("channel", "email"), "Test alert");
-    return ResponseEntity.ok(Map.of("status", "sent"));
+    return ResponseEntity.ok(Map.<String, Object>of("status", "sent"));
   }
 
   @GetMapping("/audit")
   public ResponseEntity<List<AuditEventEntity>> audit(
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestParam(required = false) String type) {
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+          @RequestParam(required = false) String type) {
     List<AuditEventEntity> events =
-        auditEventRepository.findByTenantIdAndTimestampBetweenOrderByTimestampDesc(
-            currentTenant(), from, to);
+            auditEventRepository.findByTenantIdAndTimestampBetweenOrderByTimestampDesc(
+                    currentTenant(), from, to);
     if (type != null) {
       events = events.stream().filter(event -> type.equals(event.getType())).toList();
     }
@@ -268,9 +264,9 @@ public class TenantApiController {
 
   @PostMapping("/billing/webhook/invoice")
   public ResponseEntity<Void> invoiceWebhook(
-      @RequestBody Map<String, Object> payload,
-      @RequestHeader(value = "X-Event-Id") String eventId,
-      @RequestHeader(value = "X-Signature") String signature) throws Exception {
+          @RequestBody Map<String, Object> payload,
+          @RequestHeader(value = "X-Event-Id") String eventId,
+          @RequestHeader(value = "X-Signature") String signature) throws Exception {
     UUID tenantId = UUID.fromString(payload.get("tenantId").toString());
     String status = payload.getOrDefault("status", "unknown").toString();
     billingService.processWebhook("invoice", tenantId, eventId, signature, payload);
@@ -280,9 +276,9 @@ public class TenantApiController {
 
   @PostMapping("/billing/webhook/subscription")
   public ResponseEntity<Void> subscriptionWebhook(
-      @RequestBody Map<String, Object> payload,
-      @RequestHeader(value = "X-Event-Id") String eventId,
-      @RequestHeader(value = "X-Signature") String signature) throws Exception {
+          @RequestBody Map<String, Object> payload,
+          @RequestHeader(value = "X-Event-Id") String eventId,
+          @RequestHeader(value = "X-Signature") String signature) throws Exception {
     UUID tenantId = UUID.fromString(payload.get("tenantId").toString());
     String status = payload.getOrDefault("status", "unknown").toString();
     String subId = (String) payload.getOrDefault("subscriptionId", "");
@@ -298,13 +294,13 @@ public class TenantApiController {
     String totp = body.get("totp");
     String confirm = body.get("confirm");
     if (!"YES".equalsIgnoreCase(confirm)) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Confirmación requerida"));
+      return ResponseEntity.badRequest().body(Map.<String, Object>of("error", "Confirmación requerida"));
     }
     if (password == null || password.isBlank()) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Contraseña requerida"));
+      return ResponseEntity.badRequest().body(Map.<String, Object>of("error", "Contraseña requerida"));
     }
     tenantAccountService.requestDeletion(user.getTenantId(), user.getId(), password, totp);
-    return ResponseEntity.accepted().body(Map.of("status", "scheduled"));
+    return ResponseEntity.accepted().body(Map.<String, Object>of("status", "scheduled"));
   }
 
   @PostMapping("/tenant/account/export")
@@ -313,14 +309,14 @@ public class TenantApiController {
     if (user.isMfaEnabled()) {
       String totp = body != null ? body.get("totp") : null;
       if (!tenantSecurityService.verifyTotp(user, totp)) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "TOTP requerido"));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.<String, Object>of("error", "TOTP requerido"));
       }
     }
     String token = tenantAccountService.createExportToken(user.getTenantId(), user.getId());
     return ResponseEntity.ok(
-        Map.of(
-            "token", token,
-            "expiresAt", Instant.now().plusSeconds(properties.getLegal().getExportTokenTtlMinutes() * 60L)));
+            Map.<String, Object>of(
+                    "token", token,
+                    "expiresAt", Instant.now().plusSeconds(properties.getLegal().getExportTokenTtlMinutes() * 60L)));
   }
 
   @PostMapping("/tenant/risk/pause-all")
@@ -329,16 +325,16 @@ public class TenantApiController {
     boolean pause = Boolean.TRUE.equals(body.get("pause"));
     Object confirmation = body.get("confirm");
     if (!Boolean.TRUE.equals(confirmation) && !"YES".equalsIgnoreCase(String.valueOf(confirmation))) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Confirmación requerida"));
+      return ResponseEntity.badRequest().body(Map.<String, Object>of("error", "Confirmación requerida"));
     }
     if (user.isMfaEnabled()) {
       String totp = body.get("totp") != null ? body.get("totp").toString() : null;
       if (!tenantSecurityService.verifyTotp(user, totp)) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "TOTP inválido"));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.<String, Object>of("error", "TOTP inválido"));
       }
     }
     tenantAccountService.updatePause(user.getTenantId(), pause, user.getId());
-    return ResponseEntity.ok(Map.of("paused", pause));
+    return ResponseEntity.ok(Map.<String, Object>of("paused", pause));
   }
 
   private TenantUserDetails currentUser() {

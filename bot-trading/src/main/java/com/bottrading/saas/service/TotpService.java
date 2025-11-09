@@ -3,7 +3,6 @@ package com.bottrading.saas.service;
 import com.eatthepath.otp.TimeBasedOneTimePasswordGenerator;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -17,11 +16,8 @@ import org.springframework.stereotype.Service;
 
 public interface TotpService {
   SecretKey generateSecret();
-
   String toBase32(SecretKey key);
-
   SecretKey fromBase32(String base32);
-
   boolean verify(SecretKey key, String code);
 }
 
@@ -36,11 +32,8 @@ class TotpServiceImpl implements TotpService {
   private final TimeBasedOneTimePasswordGenerator totp;
 
   TotpServiceImpl() {
-    try {
-      this.totp = new TimeBasedOneTimePasswordGenerator(STEP, DIGITS);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("Cannot initialize TOTP generator", e);
-    }
+    // En tu versión no lanza NoSuchAlgorithmException
+    this.totp = new TimeBasedOneTimePasswordGenerator(STEP, DIGITS);
   }
 
   @Override
@@ -55,9 +48,7 @@ class TotpServiceImpl implements TotpService {
 
   @Override
   public String toBase32(SecretKey key) {
-    if (key == null) {
-      return null;
-    }
+    if (key == null) return null;
     byte[] raw = key.getEncoded();
     String encoded = B32.encodeAsString(raw);
     return encoded.replace("=", "").toUpperCase(Locale.ROOT);
@@ -65,31 +56,24 @@ class TotpServiceImpl implements TotpService {
 
   @Override
   public SecretKey fromBase32(String base32) {
-    if (base32 == null || base32.isBlank()) {
-      return null;
-    }
+    if (base32 == null || base32.isBlank()) return null;
     String normalized =
-        SANITIZE
-            .matcher(base32)
-            .replaceAll("")
-            .replace("_", "")
-            .replace("=", "")
-            .toUpperCase(Locale.ROOT);
-    if (normalized.isEmpty()) {
-      return null;
-    }
+            SANITIZE.matcher(base32).replaceAll("")
+                    .replace("_", "")
+                    .replace("=", "")
+                    .toUpperCase(Locale.ROOT);
+    if (normalized.isEmpty()) return null;
+
     try {
       String padded = normalized;
       int remainder = normalized.length() % 8;
-      if (remainder != 0) {
-        padded = normalized + "=".repeat(8 - remainder);
-      }
+      if (remainder != 0) padded = normalized + "=".repeat(8 - remainder);
       byte[] decoded = B32.decode(padded);
       if (decoded != null && decoded.length > 0) {
         return new SecretKeySpec(decoded, "HmacSHA1");
       }
     } catch (IllegalArgumentException ignored) {
-      // Try legacy fallback below
+      // fallback a Base64 abajo
     }
 
     try {
@@ -105,14 +89,12 @@ class TotpServiceImpl implements TotpService {
 
   @Override
   public boolean verify(SecretKey key, String code) {
-    if (key == null || code == null || code.isBlank()) {
-      return false;
-    }
+    if (key == null || code == null || code.isBlank()) return false;
     try {
       Instant now = Instant.now();
-      int current = totp.generateOneTimePassword(key, now);
+      int current  = totp.generateOneTimePassword(key, now);
       int previous = totp.generateOneTimePassword(key, now.minus(STEP));
-      int next = totp.generateOneTimePassword(key, now.plus(STEP));
+      int next     = totp.generateOneTimePassword(key, now.plus(STEP));
       String given = code.trim();
       return given.equals(pad(current)) || given.equals(pad(previous)) || given.equals(pad(next));
     } catch (InvalidKeyException e) {
@@ -122,9 +104,7 @@ class TotpServiceImpl implements TotpService {
 
   private static String pad(int value) {
     String digits = Integer.toString(value);
-    if (digits.length() >= DIGITS) {
-      return digits;
-    }
+    if (digits.length() >= DIGITS) return digits;
     return "0".repeat(DIGITS - digits.length()) + digits;
   }
 }

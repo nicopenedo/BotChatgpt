@@ -59,18 +59,18 @@ public class OrderExecutionService {
   private final AnomalyDetector anomalyDetector;
 
   public OrderExecutionService(
-      TradingProps tradingProps,
-      BinanceClient binanceClient,
-      com.bottrading.service.trading.OrderService orderService,
-      RiskGuard riskGuard,
-      MeterRegistry meterRegistry,
-      OrderSizingService orderSizingService,
-      StopEngine stopEngine,
-      PositionManager positionManager,
-      ShadowEngine shadowEngine,
-      ExecutionEngine executionEngine,
-      IntradayVarService intradayVarService,
-      AnomalyDetector anomalyDetector) {
+          TradingProps tradingProps,
+          BinanceClient binanceClient,
+          com.bottrading.service.trading.OrderService orderService,
+          RiskGuard riskGuard,
+          MeterRegistry meterRegistry,
+          OrderSizingService orderSizingService,
+          StopEngine stopEngine,
+          PositionManager positionManager,
+          ShadowEngine shadowEngine,
+          ExecutionEngine executionEngine,
+          IntradayVarService intradayVarService,
+          AnomalyDetector anomalyDetector) {
     this.tradingProps = tradingProps;
     this.binanceClient = binanceClient;
     this.orderService = orderService;
@@ -86,12 +86,12 @@ public class OrderExecutionService {
   }
 
   public Optional<ExecutionResult> execute(
-      String decisionKey,
-      String symbol,
-      String interval,
-      StrategyDecision decision,
-      long closeTime,
-      double sizingMultiplier) {
+          String decisionKey,
+          String symbol,
+          String interval,
+          StrategyDecision decision,
+          long closeTime,
+          double sizingMultiplier) {
     SignalResult signal = decision.signal();
     if (signal.side() == SignalSide.FLAT) {
       log.debug("Decision {} is flat, no order to execute", decisionKey);
@@ -102,17 +102,17 @@ public class OrderExecutionService {
     PriceTicker priceTicker = binanceClient.getPrice(symbol);
     StrategyContext context = decision.context();
     BigDecimal lastPrice =
-        context.lastPrice() != null ? context.lastPrice() : priceTicker.price();
+            context.lastPrice() != null ? context.lastPrice() : priceTicker.price();
     BigDecimal volume24h = context.volume24h();
     Double normalizedAtr = context.normalizedAtr();
     BigDecimal atr =
-        normalizedAtr == null || lastPrice == null
-            ? null
-            : BigDecimal.valueOf(normalizedAtr).multiply(lastPrice);
+            normalizedAtr == null || lastPrice == null
+                    ? null
+                    : BigDecimal.valueOf(normalizedAtr).multiply(lastPrice);
 
     Assets assets = resolveAssets(symbol);
     AccountBalancesResponse balances =
-        orderService.getBalances(List.of(assets.base(), assets.quote()));
+            orderService.getBalances(List.of(assets.base(), assets.quote()));
     BigDecimal baseBalance = balanceOf(balances, assets.base());
     BigDecimal quoteBalance = balanceOf(balances, assets.quote());
 
@@ -124,27 +124,27 @@ public class OrderExecutionService {
     OrderSizingResult sizingResult;
     try {
       sizingResult =
-          orderSizingService.size(
-              orderSide, lastPrice, stopPlan.stopLoss(), atr, equity, exchangeInfo, sizingMultiplier);
+              orderSizingService.size(
+                      orderSide, lastPrice, stopPlan.stopLoss(), atr, equity, exchangeInfo, sizingMultiplier);
     } catch (IllegalStateException | IllegalArgumentException ex) {
       log.warn("Sizing failed for {}: {}", decisionKey, ex.getMessage());
       return Optional.empty();
     }
 
     VarAssessment varAssessment =
-        intradayVarService.assess(
-            new VarInput(
-                symbol,
-                decision.preset(),
-                decision.banditSelection() != null ? decision.banditSelection().presetId() : null,
-                decision.regime() != null ? decision.regime().trend().name() : null,
-                decision.regime() != null ? decision.regime().volatility().name() : null,
-                orderSide,
-                lastPrice,
-                stopPlan.stopLoss(),
-                sizingResult.quantity(),
-                equity,
-                exchangeInfo.stepSize()));
+            intradayVarService.assess(
+                    new VarInput(
+                            symbol,
+                            decision.preset(),
+                            decision.banditSelection() != null ? decision.banditSelection().presetId() : null,
+                            decision.regime() != null ? decision.regime().trend().name() : null,
+                            decision.regime() != null ? decision.regime().volatility().name() : null,
+                            orderSide,
+                            lastPrice,
+                            stopPlan.stopLoss(),
+                            sizingResult.quantity(),
+                            equity,
+                            exchangeInfo.stepSize()));
     if (varAssessment.blocked()) {
       log.info("VAR guard blocked {} reasons={}", decisionKey, varAssessment.reasons());
       return Optional.empty();
@@ -172,79 +172,79 @@ public class OrderExecutionService {
 
     BigDecimal notional = quantity.multiply(lastPrice);
     ExecutionRequest request =
-        new ExecutionRequest(
-            symbol,
-            orderSide,
-            quantity,
-            lastPrice,
-            notional,
-            exchangeInfo,
-            resolveUrgency(decision.signal().confidence()),
-            estimateMaxSlippageBps(lastPrice, atr),
-            Instant.ofEpochMilli(closeTime).plusSeconds(120),
-            tradingProps.isDryRun(),
-            volume24h,
-            atr,
-            estimateSpreadBps(exchangeInfo, lastPrice),
-            estimateVolatilityBps(atr, lastPrice),
-            0,
-            newClientOrderId(symbol, interval, closeTime));
+            new ExecutionRequest(
+                    symbol,
+                    orderSide,
+                    quantity,
+                    lastPrice,
+                    notional,
+                    exchangeInfo,
+                    resolveUrgency(decision.signal().confidence()),
+                    estimateMaxSlippageBps(lastPrice, atr),
+                    Instant.ofEpochMilli(closeTime).plusSeconds(120),
+                    tradingProps.isDryRun(),
+                    volume24h,
+                    atr,
+                    estimateSpreadBps(exchangeInfo, lastPrice),
+                    estimateVolatilityBps(atr, lastPrice),
+                    0,
+                    newClientOrderId(symbol, interval, closeTime));
 
     MarketSnapshot snapshot =
-        new MarketSnapshot(
-            lastPrice,
-            request.spreadBps(),
-            request.expectedVolatilityBps(),
-            request.latencyMs(),
-            estimateBarVolume(volume24h),
-            estimateQuoteBarVolume(volume24h, lastPrice));
+            new MarketSnapshot(
+                    lastPrice,
+                    request.spreadBps(),
+                    request.expectedVolatilityBps(),
+                    request.latencyMs(),
+                    estimateBarVolume(volume24h),
+                    estimateQuoteBarVolume(volume24h, lastPrice));
 
     try {
       ExecutionResult result = executionEngine.execute(request, snapshot);
       log.info(
-          "Order {} executed plan={} executedQty={} avgPrice={} dryRun={}",
-          decisionKey,
-          result.plan().getClass().getSimpleName(),
-          result.executedQty(),
-          result.averagePrice(),
-          tradingProps.isDryRun());
+              "Order {} executed plan={} executedQty={} avgPrice={} dryRun={}",
+              decisionKey,
+              result.plan().getClass().getSimpleName(),
+              result.executedQty(),
+              result.averagePrice(),
+              tradingProps.isDryRun());
       if (!tradingProps.isDryRun() && result.executedQty().compareTo(BigDecimal.ZERO) > 0) {
-        BigDecimal notional = result.averagePrice().multiply(result.executedQty());
-        riskGuard.onTrade(new TradeEvent(symbol, true, BigDecimal.ZERO, null, notional));
+        BigDecimal executedNotional = result.averagePrice().multiply(result.executedQty());
+        riskGuard.onTrade(new TradeEvent(symbol, true, BigDecimal.ZERO, null, executedNotional));
         String lastClientOrderId =
-            result.orders().isEmpty()
-                ? request.baseClientOrderId()
-                : result.orders().get(result.orders().size() - 1).clientOrderId();
+                result.orders().isEmpty()
+                        ? request.baseClientOrderId()
+                        : result.orders().get(result.orders().size() - 1).clientOrderId();
         positionManager.openPosition(
-            new PositionManager.OpenPositionCommand(
+                new PositionManager.OpenPositionCommand(
+                        symbol,
+                        orderSide,
+                        result.averagePrice(),
+                        result.executedQty(),
+                        stopPlan.stopLoss(),
+                        stopPlan.takeProfit(),
+                        null,
+                        lastClientOrderId,
+                        decision.regime() != null ? decision.regime().trend().name() : null,
+                        decision.regime() != null ? decision.regime().volatility().name() : null,
+                        decision.preset(),
+                        decision.banditSelection() != null ? decision.banditSelection().presetId() : null));
+        shadowEngine.registerShadow(
                 symbol,
                 orderSide,
                 result.averagePrice(),
                 result.executedQty(),
-                stopPlan.stopLoss(),
-                stopPlan.takeProfit(),
-                null,
-                lastClientOrderId,
+                stopPlan,
                 decision.regime() != null ? decision.regime().trend().name() : null,
                 decision.regime() != null ? decision.regime().volatility().name() : null,
                 decision.preset(),
-                decision.banditSelection() != null ? decision.banditSelection().presetId() : null));
-        shadowEngine.registerShadow(
-            symbol,
-            orderSide,
-            result.averagePrice(),
-            result.executedQty(),
-            stopPlan,
-            decision.regime() != null ? decision.regime().trend().name() : null,
-            decision.regime() != null ? decision.regime().volatility().name() : null,
-            decision.preset(),
-            decision.banditSelection() != null ? decision.banditSelection().presetId() : null);
+                decision.banditSelection() != null ? decision.banditSelection().presetId() : null);
       }
       if (request.quantity().compareTo(BigDecimal.ZERO) > 0) {
         double fillRate =
-            result.executedQty()
-                .divide(request.quantity(), 6, RoundingMode.HALF_UP)
-                .doubleValue();
+                result.executedQty()
+                        .divide(request.quantity(), 6, RoundingMode.HALF_UP)
+                        .doubleValue();
         anomalyDetector.recordFillRate(symbol, fillRate);
       }
       return Optional.of(result);
@@ -280,10 +280,10 @@ public class OrderExecutionService {
       return 5.0;
     }
     return exchangeInfo
-        .tickSize()
-        .divide(price, 8, RoundingMode.HALF_UP)
-        .multiply(BigDecimal.valueOf(10000))
-        .doubleValue();
+            .tickSize()
+            .divide(price, 8, RoundingMode.HALF_UP)
+            .multiply(BigDecimal.valueOf(10000))
+            .doubleValue();
   }
 
   private double estimateVolatilityBps(BigDecimal atr, BigDecimal price) {
@@ -317,16 +317,16 @@ public class OrderExecutionService {
       return BigDecimal.ZERO;
     }
     return response.balances().stream()
-        .filter(balance -> balance.asset().equalsIgnoreCase(asset))
-        .findFirst()
-        .map(AccountBalancesResponse.Balance::free)
-        .orElse(BigDecimal.ZERO);
+            .filter(balance -> balance.asset().equalsIgnoreCase(asset))
+            .findFirst()
+            .map(AccountBalancesResponse.Balance::free)
+            .orElse(BigDecimal.ZERO);
   }
 
   private Assets resolveAssets(String symbol) {
     String upper = symbol.toUpperCase();
     List<String> knownQuotes =
-        List.of("USDT", "BUSD", "USDC", "BTC", "ETH", "BNB", "EUR", "TRY", "BIDR", "AUD");
+            List.of("USDT", "BUSD", "USDC", "BTC", "ETH", "BNB", "EUR", "TRY", "BIDR", "AUD");
     for (String quote : knownQuotes) {
       if (upper.endsWith(quote)) {
         String base = upper.substring(0, upper.length() - quote.length());

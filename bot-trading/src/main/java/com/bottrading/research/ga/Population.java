@@ -19,7 +19,7 @@ public class Population {
   }
 
   public void sort() {
-    genomes.sort(Comparator.comparingDouble(genome -> genome.fitness()).reversed());
+    genomes.sort((g1, g2) -> Double.compare(g2.fitness(), g1.fitness()));
   }
 
   public Genome best() {

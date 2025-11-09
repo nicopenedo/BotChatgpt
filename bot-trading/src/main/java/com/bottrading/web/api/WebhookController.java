@@ -5,16 +5,13 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.commons.codec.DecoderException;     // <- importar
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/webhooks")
@@ -28,8 +25,8 @@ public class WebhookController {
 
   @PostMapping("/provider")
   public ResponseEntity<Void> handle(
-      @RequestHeader(value = "X-Signature", required = false) String signature,
-      @RequestBody byte[] payload) {
+          @RequestHeader(value = "X-Signature", required = false) String signature,
+          @RequestBody byte[] payload) {
     if (!StringUtils.hasText(signature) || !isValidSignature(signature, payload)) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
@@ -41,9 +38,12 @@ public class WebhookController {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(new SecretKeySpec(secret, "HmacSHA256"));
       byte[] expected = mac.doFinal(payload);
-      byte[] provided = Hex.decodeHex(signature.toCharArray());
+
+      // usa la sobrecarga con CharSequence
+      byte[] provided = Hex.decodeHex(signature);  // también lanza DecoderException
+
       return MessageDigest.isEqual(expected, provided);
-    } catch (GeneralSecurityException | IllegalArgumentException e) {
+    } catch (GeneralSecurityException | IllegalArgumentException | DecoderException e) {
       return false;
     }
   }

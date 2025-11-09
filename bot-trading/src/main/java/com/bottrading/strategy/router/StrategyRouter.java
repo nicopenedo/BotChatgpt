@@ -44,10 +44,11 @@ public class StrategyRouter {
     int hysteresis = Math.max(1, routerConfig.hysteresis());
     String target = resolvePreset(catalog, routerConfig.rules(), fallback, regime);
     if (regime != null) {
+      final String fallbackForActive = target; // <- effectively final para el lambda
       Optional<String> activePreset =
-          presetService
-              .getActivePreset(regime.trend(), OrderSide.BUY)
-              .map(preset -> deriveStrategyKey(preset.getParamsJson(), target));
+              presetService
+                      .getActivePreset(regime.trend(), OrderSide.BUY)
+                      .map(preset -> deriveStrategyKey(preset.getParamsJson(), fallbackForActive));
       if (activePreset.isPresent()) {
         target = activePreset.get();
       }

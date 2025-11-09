@@ -93,7 +93,7 @@ public class BinanceClientImpl implements BinanceClient {
     Map<String, Object> params = new HashMap<>();
     params.put("symbol", symbol);
     String response =
-        execute(Endpoint.PRICE_TICKER, symbol, () -> spotClient.createMarket().tickerPrice(params));
+        execute(Endpoint.PRICE_TICKER, symbol, () -> spotClient.createMarket().tickerSymbol(params));
     JsonNode node = readTree(response);
     return new PriceTicker(symbol, new BigDecimal(node.get("price").asText()));
   }

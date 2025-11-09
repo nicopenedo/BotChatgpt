@@ -35,7 +35,7 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
   private static final Logger log = LoggerFactory.getLogger(PrometheusScrapeSecurityFilter.class);
   private static final String PROMETHEUS_PATH = "/actuator/prometheus";
   public static final String ACCESS_GRANTED_ATTRIBUTE =
-      PrometheusScrapeSecurityFilter.class.getName() + ".ACCESS_GRANTED";
+          PrometheusScrapeSecurityFilter.class.getName() + ".ACCESS_GRANTED";
   private static final String PROMETHEUS_TOKEN_HEADER = "X-Prometheus-Token";
   private static final String X_FORWARDED_FOR = "X-Forwarded-For";
   private static final String X_REAL_IP = "X-Real-IP";
@@ -47,10 +47,10 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
   private final List<IpAddressMatcher> trustedProxyMatchers;
 
   public PrometheusScrapeSecurityFilter(
-      PrometheusSecurityProps properties,
-      @Value("${management.metrics.export.prometheus.enabled:true}")
+          PrometheusSecurityProps properties,
+          @Value("${management.metrics.export.prometheus.enabled:true}")
           boolean prometheusExportEnabled,
-      WebEndpointProperties webEndpointProperties) {
+          WebEndpointProperties webEndpointProperties) {
     this.properties = properties;
     this.prometheusExportEnabled = prometheusExportEnabled;
     this.prometheusEndpointExposed = isPrometheusEndpointExposed(webEndpointProperties);
@@ -72,8 +72,8 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
-      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-      throws ServletException, IOException {
+          HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+          throws ServletException, IOException {
     if (!HttpMethod.GET.matches(request.getMethod())) {
       reject(response, HttpStatus.METHOD_NOT_ALLOWED);
       return;
@@ -85,14 +85,14 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
 
     if (!protectionEnabled && !properties.hasSecurityPolicies()) {
       log.warn(
-          "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
+              "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
       reject(response, HttpStatus.FORBIDDEN);
       return;
     }
 
     if (!properties.hasSecurityPolicies()) {
       log.warn(
-          "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
+              "Prometheus expuesto pero sin token ni allowlist. Acceso denegado por fail-safe; configure observability.prometheus.token o allowlist-cidrs.");
       reject(response, HttpStatus.FORBIDDEN);
       return;
     }
@@ -162,10 +162,10 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
     }
 
     ForwardedHeaderResult forwardedCandidate = resolveFromForwardedHeaders(request);
-    if (forwardedCandidate.invalid()) {
+    if (forwardedCandidate.invalid()) { // accessor implícito del record
       return Optional.empty();
     }
-    if (forwardedCandidate.clientIp().isPresent()) {
+    if (forwardedCandidate.clientIp().isPresent()) { // accessor implícito del record
       return forwardedCandidate.clientIp();
     }
 
@@ -179,10 +179,10 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
       for (String part : parts) {
         String candidate = part.trim();
         if (!isValidIp(candidate)) {
-          return ForwardedHeaderResult.invalid();
+          return ForwardedHeaderResult.invalidResult();
         }
         if (!matches(candidate, trustedProxyMatchers)) {
-          return ForwardedHeaderResult.resolved(candidate);
+          return ForwardedHeaderResult.resolvedResult(candidate);
         }
       }
     }
@@ -191,14 +191,14 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
     if (StringUtils.hasText(realIp)) {
       String candidate = realIp.trim();
       if (!isValidIp(candidate)) {
-        return ForwardedHeaderResult.invalid();
+        return ForwardedHeaderResult.invalidResult();
       }
       if (!matches(candidate, trustedProxyMatchers)) {
-        return ForwardedHeaderResult.resolved(candidate);
+        return ForwardedHeaderResult.resolvedResult(candidate);
       }
     }
 
-    return ForwardedHeaderResult.none();
+    return ForwardedHeaderResult.noneResult();
   }
 
   private boolean matches(String candidate, List<IpAddressMatcher> matchers) {
@@ -282,31 +282,25 @@ public class PrometheusScrapeSecurityFilter extends OncePerRequestFilter {
       return Set.of();
     }
     return values.stream()
-        .filter(StringUtils::hasText)
-        .map(value -> value.trim().toLowerCase(Locale.ROOT))
-        .collect(Collectors.toUnmodifiableSet());
+            .filter(StringUtils::hasText)
+            .map(value -> value.trim().toLowerCase(Locale.ROOT))
+            .collect(Collectors.toUnmodifiableSet());
   }
 
+  // === Record: usar nombres de factories distintos a los accessors implícitos ===
   private record ForwardedHeaderResult(Optional<String> clientIp, boolean invalid) {
-    private static ForwardedHeaderResult resolved(String ip) {
+    public static ForwardedHeaderResult resolvedResult(String ip) {
       return new ForwardedHeaderResult(Optional.of(ip), false);
     }
 
-    private static ForwardedHeaderResult invalid() {
+    public static ForwardedHeaderResult invalidResult() {
       return new ForwardedHeaderResult(Optional.empty(), true);
     }
 
-    private static ForwardedHeaderResult none() {
+    public static ForwardedHeaderResult noneResult() {
       return new ForwardedHeaderResult(Optional.empty(), false);
     }
-
-    public Optional<String> clientIp() {
-      return clientIp;
-    }
-
-    public boolean invalid() {
-      return invalid;
-    }
+    // No redefinir clientIp() ni invalid(): los genera el record.
   }
 
   private void reject(HttpServletResponse response, HttpStatus status) throws IOException {

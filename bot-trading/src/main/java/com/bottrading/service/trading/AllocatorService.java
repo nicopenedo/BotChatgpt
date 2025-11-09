@@ -40,11 +40,11 @@ public class AllocatorService {
   private final ConcurrentMap<String, AllocationStatus> lastStatus = new ConcurrentHashMap<>();
 
   public AllocatorService(
-      TradingProps tradingProps,
-      PositionRepository positionRepository,
-      BinanceClient binanceClient,
-      MeterRegistry meterRegistry,
-      IntradayVarService intradayVarService) {
+          TradingProps tradingProps,
+          PositionRepository positionRepository,
+          BinanceClient binanceClient,
+          MeterRegistry meterRegistry,
+          IntradayVarService intradayVarService) {
     this.tradingProps = tradingProps;
     this.positionRepository = positionRepository;
     this.binanceClient = binanceClient;
@@ -54,7 +54,7 @@ public class AllocatorService {
 
   public AllocationDecision evaluate(String symbol) {
     if (!tradingProps.getAllocator().isEnabled()) {
-      AllocationDecision decision = AllocationDecision.allowed();
+      AllocationDecision decision = AllocationDecision.ok();
       lastStatus.put(symbol, new AllocationStatus(symbol, decision.allowed(), decision.reason(), 1.0));
       return decision;
     }
@@ -79,33 +79,33 @@ public class AllocatorService {
       return AllocationDecision.blocked("MAX_SIMULTANEOUS");
     }
     if (props.getPortfolioMaxTotalRiskPct() != null
-        && props.getPortfolioMaxTotalRiskPct().doubleValue() > 0
-        && portfolioRisk > props.getPortfolioMaxTotalRiskPct().doubleValue()) {
+            && props.getPortfolioMaxTotalRiskPct().doubleValue() > 0
+            && portfolioRisk > props.getPortfolioMaxTotalRiskPct().doubleValue()) {
       return AllocationDecision.blocked("PORTFOLIO_RISK");
     }
 
     long symbolPositions =
-        open.stream().filter(p -> symbol.equalsIgnoreCase(p.getSymbol())).count();
+            open.stream().filter(p -> symbol.equalsIgnoreCase(p.getSymbol())).count();
     double symbolRisk = (symbolPositions + 1) * riskPerTrade;
     if (props.getPerSymbolMaxRiskPct() != null
-        && props.getPerSymbolMaxRiskPct().doubleValue() > 0
-        && symbolRisk > props.getPerSymbolMaxRiskPct().doubleValue()) {
+            && props.getPerSymbolMaxRiskPct().doubleValue() > 0
+            && symbolRisk > props.getPerSymbolMaxRiskPct().doubleValue()) {
       return AllocationDecision.blocked("SYMBOL_RISK");
     }
 
     if (intradayVarService != null && intradayVarService.isEnabled()) {
       IntradayVarService.ExposureSnapshot exposure = intradayVarService.exposure(null);
       if (exposure.limit().compareTo(BigDecimal.ZERO) > 0
-          && exposure.ratio().compareTo(BigDecimal.ONE) >= 0) {
+              && exposure.ratio().compareTo(BigDecimal.ONE) >= 0) {
         return AllocationDecision.blocked("VAR_BUDGET");
       }
     }
 
     Set<String> otherSymbols =
-        open.stream()
-            .map(PositionEntity::getSymbol)
-            .filter(s -> !symbol.equalsIgnoreCase(s))
-            .collect(Collectors.toSet());
+            open.stream()
+                    .map(PositionEntity::getSymbol)
+                    .filter(s -> !symbol.equalsIgnoreCase(s))
+                    .collect(Collectors.toSet());
 
     for (String other : otherSymbols) {
       double corr = correlation(symbol, other);
@@ -114,7 +114,7 @@ public class AllocatorService {
       }
     }
 
-    return AllocationDecision.allowed();
+    return AllocationDecision.ok();
   }
 
   private List<PositionEntity> openPositions() {
@@ -136,9 +136,9 @@ public class AllocatorService {
     }
     try {
       List<com.bottrading.model.dto.Kline> seriesA =
-          binanceClient.getKlines(symbolA, CORR_INTERVAL, tradingProps.getAllocator().getCorrLookbackDays() + 1);
+              binanceClient.getKlines(symbolA, CORR_INTERVAL, tradingProps.getAllocator().getCorrLookbackDays() + 1);
       List<com.bottrading.model.dto.Kline> seriesB =
-          binanceClient.getKlines(symbolB, CORR_INTERVAL, tradingProps.getAllocator().getCorrLookbackDays() + 1);
+              binanceClient.getKlines(symbolB, CORR_INTERVAL, tradingProps.getAllocator().getCorrLookbackDays() + 1);
       double value = computeCorrelation(seriesA, seriesB);
       correlationCache.put(key, new CachedCorrelation(value, Instant.now()));
       return value;
@@ -149,7 +149,7 @@ public class AllocatorService {
   }
 
   private double computeCorrelation(
-      List<com.bottrading.model.dto.Kline> seriesA, List<com.bottrading.model.dto.Kline> seriesB) {
+          List<com.bottrading.model.dto.Kline> seriesA, List<com.bottrading.model.dto.Kline> seriesB) {
     if (seriesA == null || seriesB == null || seriesA.size() < 3 || seriesB.size() < 3) {
       return Double.NaN;
     }
@@ -220,25 +220,15 @@ public class AllocatorService {
   }
 
   public record AllocationDecision(boolean allowed, String reason, double sizingMultiplier) {
-    static AllocationDecision allowed() {
+    // Factory renombrado para no chocar con el accessor allowed()
+    public static AllocationDecision ok() {
       return new AllocationDecision(true, "OK", 1.0);
     }
 
-    static AllocationDecision blocked(String reason) {
+    public static AllocationDecision blocked(String reason) {
       return new AllocationDecision(false, reason, 0.0);
     }
-
-    public boolean allowed() {
-      return allowed;
-    }
-
-    public String reason() {
-      return reason;
-    }
-
-    public double sizingMultiplier() {
-      return sizingMultiplier;
-    }
+    // Accessors (allowed(), reason(), sizingMultiplier()) los genera el record automáticamente.
   }
 
   public record AllocationStatus(String symbol, boolean allowed, String reason, double sizingMultiplier) {}
