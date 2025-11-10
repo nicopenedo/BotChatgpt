@@ -12,13 +12,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
       "management.metrics.export.prometheus.enabled=true",
       "prometheus.allowlist=127.0.0.1/32",
       "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
     })
 @AutoConfigureMockMvc
-@ActiveProfiles("prod")
+@ActiveProfiles("test")
 class PrometheusScrapeSecurityLegacyAllowlistTest {
 
   @Autowired private MockMvc mockMvc;

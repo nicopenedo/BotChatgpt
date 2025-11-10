@@ -11,6 +11,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
       "observability.prometheus.enabled=false",
       "management.metrics.export.prometheus.enabled=false",
@@ -18,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "management.endpoints.web.exposure.include=health,info,metrics"
     })
 @AutoConfigureMockMvc
-@ActiveProfiles("prod")
+@ActiveProfiles("test")
 class PrometheusEndpointDisabledTest {
 
   @Autowired private MockMvc mockMvc;

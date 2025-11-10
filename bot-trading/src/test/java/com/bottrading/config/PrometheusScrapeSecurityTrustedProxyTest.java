@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
       "observability.prometheus.enabled=true",
       "management.metrics.export.prometheus.enabled=true",
@@ -21,7 +22,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
       "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
     })
 @AutoConfigureMockMvc
-@ActiveProfiles("prod")
+@ActiveProfiles("test")
 class PrometheusScrapeSecurityTrustedProxyTest {
 
   @Autowired private MockMvc mockMvc;
