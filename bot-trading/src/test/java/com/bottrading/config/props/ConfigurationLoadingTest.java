@@ -11,7 +11,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 class ConfigurationLoadingTest {
 
   @DynamicPropertySource

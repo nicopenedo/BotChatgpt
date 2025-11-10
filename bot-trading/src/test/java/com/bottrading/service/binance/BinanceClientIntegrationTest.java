@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
-
 import com.bottrading.throttle.Throttle;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class BinanceClientIntegrationTest {
 
@@ -36,7 +36,8 @@ class BinanceClientIntegrationTest {
     WireMock.configureFor("localhost", wireMockServer.port());
 
     BinanceProperties properties =
-        new BinanceProperties("key", "secret", wireMockServer.baseUrl());
+        new BinanceProperties(
+            "key", "secret", wireMockServer.baseUrl(), wireMockServer.baseUrl());
     CacheManager cacheManager = new CaffeineCacheManager(CacheConfig.EXCHANGE_INFO_CACHE, CacheConfig.COMMISSION_CACHE);
     ((CaffeineCacheManager) cacheManager).setCaffeine(Caffeine.newBuilder());
     Throttle throttle = Mockito.mock(Throttle.class);
@@ -49,7 +50,9 @@ class BinanceClientIntegrationTest {
         });
     ChaosSuite chaosSuite = Mockito.mock(ChaosSuite.class);
     Mockito.when(chaosSuite.decorateApiCall(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
-    binanceClient = new BinanceClientImpl(properties, cacheManager, throttle, chaosSuite);
+    binanceClient =
+        new BinanceClientImpl(
+            properties, cacheManager, throttle, chaosSuite, new SimpleMeterRegistry());
   }
 
   @AfterEach
